@@ -13,9 +13,8 @@
             --border-color: #444;
             --attention-color: #ff5555;
             --nofile-color: #00ff66;
-            --purple-num: #b55fe6;
             --yellow-flag: #ffff00;
-            --orange-flag: #ff7700; /* Orange for malicious database items */
+            --orange-flag: #ff7700;
         }
 
         body {
@@ -125,17 +124,6 @@
 
         #log-display div { padding: 2px 0; }
 
-        .line-num {
-            color: var(--purple-num);
-            font-weight: bold;
-            cursor: pointer;
-            margin-left: 12px;
-            display: inline-block;
-            user-select: none;
-            padding: 0 4px;
-        }
-        .line-num:active { background: #444; border-radius: 3px; }
-
         /* Highlight Rules */
         .hl-attention { color: var(--attention-color); font-weight: bold; }
         .hl-nofile { color: var(--nofile-color); font-weight: bold; }
@@ -239,19 +227,6 @@
         }
         .delete-btn { color: #ff5555; cursor: pointer; font-size: 12px; }
         
-        #toast {
-            display: none;
-            position: fixed;
-            top: 20px; left: 50%;
-            transform: translateX(-50%);
-            background: var(--purple-num);
-            color: white;
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-weight: bold;
-            z-index: 300;
-            font-size: 12px;
-        }
         .db-tag {
             display: inline-block;
             background: #444;
@@ -265,8 +240,6 @@
     </style>
 </head>
 <body>
-
-    <div id="toast">Added to Fixlist</div>
 
     <div class="input-group">
         <textarea id="log-input" placeholder="Paste FRST log here..."></textarea>
@@ -369,6 +342,10 @@ End::</textarea>
         let currentLogLines = [];
         const initialFixlistTemplate = `Start::\nSystemRestore: On\nCreateRestorePoint:\nCloseProcesses:\n\n\n---\n\nEmptyTemp:\nHosts:\nEnd::`;
 
+        // Explicit Section Lists mapping for FRST and Addition logs
+        const frstSections = ["processes", "registry", "scheduled tasks", "internet", "services", "drivers", "netsvcs", "one month (created)", "one month (modified)", "files in root", "sigcheck"];
+        const additionSections = ["accounts", "security center", "installed programs", "packages", "custom clsid", "codecs", "shortcuts & wmi", "loaded modules", "alternate data streams", "safe mode", "association", "internet explorer", "hosts content", "network", "other areas", "msconfig", "firewallrules", "restore points", "faulty device manager", "event log errors", "memory info", "drives", "mbr & partition table"];
+
         function safeGetStorage(key, defaultVal) {
             try { return JSON.parse(localStorage.getItem(key)) || defaultVal; } 
             catch (e) { return defaultVal; }
@@ -394,29 +371,6 @@ End::</textarea>
             reader.readAsText(file);
         }
 
-        // Smart Logic Engine: Strips FRST preamble timestamps, attributes, and trailing brackets
-        function extractFrstCorePath(line) {
-            let cleaned = line.trim();
-
-            // 1. Strip double timestamps + sizes + attributes (e.g., "2026-05-25 12:00 - 2026-05-25 12:01 - 000123456 ____A C:\path")
-            cleaned = cleaned.replace(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2} - \d{4}-\d{2}-\d{2} \d{2}:\d{2} - \d+ [_\w\-]{5}\s?([A-Z]:\\)/i, '$1');
-            cleaned = cleaned.replace(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2} - \d{4}-\d{2}-\d{2} \d{2}:\d{2} - \d+ [_\w\-]{5}\s+/, '');
-
-            // 2. Strip single timestamps + sizes + attributes (e.g., "2026-05-25 12:00 - 000123456 ____A C:\path")
-            cleaned = cleaned.replace(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2} - \d+ [_\w\-]{5}\s?([A-Z]:\\)/i, '$1');
-            cleaned = cleaned.replace(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2} - \d+ [_\w\-]{5}\s+/, '');
-
-            // 3. Strip basic lone timestamps from registry/services lines (e.g., "2026-05-25 12:00 - RunKey")
-            cleaned = cleaned.replace(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2} - \s*/, '');
-
-            // 4. Strip trailing system brackets completely (e.g., "[12345 2026-05-25]", "[12345]", or MD5/SHA hashes in brackets)
-            cleaned = cleaned.replace(/\s*\[\d+\s+\d{4}-\d{2}-\d{2}\]$/, '');
-            cleaned = cleaned.replace(/\s*\[\d+\]$/, '');
-            cleaned = cleaned.replace(/\s*\[[A-Fa-f0-9]{32,64}\]$/, '');
-
-            return cleaned;
-        }
-
         function renderLog() {
             const rawText = document.getElementById('log-input').value;
             if (!rawText) return;
@@ -428,6 +382,12 @@ End::</textarea>
             const jumper = document.getElementById('section-jumper');
             jumper.innerHTML = '<option value="">-- Jump to Section --</option>';
 
+            // Setup separated OptGroups for the dropdown navigation panel
+            const frstGroup = document.createElement('optgroup');
+            frstGroup.label = "─── FRST.txt Sections ───";
+            const additionGroup = document.createElement('optgroup');
+            additionGroup.label = "─── Addition.txt Sections ───";
+
             const yellowDB = safeGetStorage('frst_yellow_db', []);
             const orangeDB = safeGetStorage('frst_orange_db', []);
             const fragment = document.createDocumentFragment();
@@ -436,12 +396,27 @@ End::</textarea>
                 const lineEl = document.createElement('div');
                 lineEl.id = `log-L${index}`;
                 
+                // Track standard log dividing headers
                 if (line.startsWith('====================') && line.trim().endsWith('====================')) {
                     const cleanTitle = line.replace(/=/g, '').trim();
+                    const lowerTitle = cleanTitle.toLowerCase();
+
                     const opt = document.createElement('option');
                     opt.value = `log-L${index}`;
                     opt.textContent = cleanTitle;
-                    jumper.appendChild(opt);
+
+                    // Separate dynamically into matching categories
+                    let matchedFrst = frstSections.some(sec => lowerTitle.includes(sec));
+                    let matchedAddition = additionSections.some(sec => lowerTitle.includes(sec));
+
+                    if (matchedFrst) {
+                        frstGroup.appendChild(opt);
+                    } else if (matchedAddition) {
+                        additionGroup.appendChild(opt);
+                    } else {
+                        // Default fallback if a generic partition bar runs
+                        frstGroup.appendChild(opt);
+                    }
                 }
 
                 let safeLine = line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -460,21 +435,13 @@ End::</textarea>
                 }
 
                 lineEl.innerHTML = safeLine || '&nbsp;';
-                
-                const numSpan = document.createElement('span');
-                numSpan.className = 'line-num';
-                numSpan.textContent = `[${index + 1}]`;
-                numSpan.onclick = function(e) {
-                    e.stopPropagation();
-                    // Extract only the path/task payload before moving to fixlist
-                    let corePayload = extractFrstCorePath(line);
-                    appendLineToFixlist(corePayload);
-                };
-
-                lineEl.appendChild(numSpan);
                 fragment.appendChild(lineEl);
             });
             
+            // Append explicit groupings cleanly to the jumper panel tool
+            if (frstGroup.children.length > 0) jumper.appendChild(frstGroup);
+            if (additionGroup.children.length > 0) jumper.appendChild(additionGroup);
+
             displayEl.appendChild(fragment);
             document.querySelector('.input-group').style.display = 'none'; 
             document.getElementById('utility-bar').style.display = 'flex';
@@ -501,25 +468,6 @@ End::</textarea>
                     lines[i].style.display = 'none';
                 }
             }
-        }
-
-        function appendLineToFixlist(cleanedLine) {
-            if(!cleanedLine.trim()) return;
-            const fixArea = document.getElementById('fixlist-area');
-            let currentText = fixArea.value;
-
-            if (currentText.includes('---')) {
-                currentText = currentText.replace('---', cleanedLine.trim() + '\n---');
-            } else if (currentText.includes('End::')) {
-                currentText = currentText.replace('End::', cleanedLine.trim() + '\nEnd::');
-            } else {
-                currentText += '\n' + cleanedLine.trim();
-            }
-            fixArea.value = currentText;
-
-            const toast = document.getElementById('toast');
-            toast.style.display = 'block';
-            setTimeout(() => { toast.style.display = 'none'; }, 1000);
         }
 
         function clearFixlist() {
