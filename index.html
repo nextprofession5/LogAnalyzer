@@ -13,8 +13,8 @@
             --border-color: #444;
             --attention-color: #ff5555;
             --nofile-color: #00ff66;
-            --purple-num: #b55fe6; /* Purple for line numbers */
-            --yellow-flag: #ffff00; /* Yellow for database items */
+            --purple-num: #b55fe6;
+            --yellow-flag: #ffff00;
         }
 
         body {
@@ -27,7 +27,6 @@
             padding-bottom: 80px;
         }
 
-        /* Controls Area */
         .input-group {
             background: var(--container-bg);
             padding: 8px;
@@ -55,8 +54,16 @@
             align-items: center;
         }
 
+        /* PATCH: Visually hidden instead of display: none for mobile compatibility */
         input[type="file"] {
-            display: none;
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0,0,0,0);
+            border: 0;
         }
 
         .custom-file-upload {
@@ -102,7 +109,6 @@
         button:active { opacity: 0.8; }
         .btn-block { width: 100%; margin-top: 10px; }
 
-        /* Log Display */
         #log-display {
             background: var(--container-bg);
             border: 1px solid var(--border-color);
@@ -117,11 +123,8 @@
             line-height: 1.4;
         }
 
-        #log-display div {
-            padding: 2px 0;
-        }
+        #log-display div { padding: 2px 0; }
 
-        /* Purple Line Numbers at the end of elements */
         .line-num {
             color: var(--purple-num);
             font-weight: bold;
@@ -131,17 +134,12 @@
             user-select: none;
             padding: 0 4px;
         }
-        .line-num:active {
-            background: #444;
-            border-radius: 3px;
-        }
+        .line-num:active { background: #444; border-radius: 3px; }
 
-        /* Highlighting Styles */
         .hl-attention { color: var(--attention-color); font-weight: bold; }
         .hl-nofile { color: var(--nofile-color); font-weight: bold; }
         .hl-yellow { color: var(--yellow-flag); font-weight: bold; background-color: rgba(255, 255, 0, 0.1); }
 
-        /* Action Footer for Mobile */
         .footer-nav {
             position: fixed;
             bottom: 0; left: 0; right: 0;
@@ -154,7 +152,6 @@
         }
         .footer-nav button { flex: 1; margin: 0; font-size: 13px; padding: 10px 4px; }
 
-        /* Modals */
         .modal {
             display: none;
             position: fixed;
@@ -214,7 +211,6 @@
             font-size: 11px;
         }
 
-        /* Helper GUI Sections */
         .helper-section {
             border: 1px solid #444;
             background: #252525;
@@ -365,6 +361,16 @@ End::</textarea>
         let currentLogLines = [];
         const initialFixlistTemplate = `Start::\nSystemRestore: On\nCreateRestorePoint:\nCloseProcesses:\n\n\n---\n\nEmptyTemp:\nHosts:\nEnd::`;
 
+        // PATCH: Safe LocalStorage wrappers to prevent mobile script crashes
+        function safeGetStorage(key, defaultVal) {
+            try { return JSON.parse(localStorage.getItem(key)) || defaultVal; } 
+            catch (e) { return defaultVal; }
+        }
+        function safeSetStorage(key, val) {
+            try { localStorage.setItem(key, JSON.stringify(val)); } 
+            catch (e) { console.warn("Storage restricted on this device."); }
+        }
+
         function handleFileUpload() {
             const fileInput = document.getElementById('file-picker');
             const fileNameDisplay = document.getElementById('file-name');
@@ -376,11 +382,11 @@ End::</textarea>
             const reader = new FileReader();
             reader.onload = function(e) {
                 document.getElementById('log-input').value = e.target.result;
+                renderLog(); // Auto-load the log instantly!
             };
             reader.readAsText(file);
         }
 
-        // Render log lines with clean styling rules
         function renderLog() {
             const rawText = document.getElementById('log-input').value;
             if (!rawText) return;
@@ -392,14 +398,13 @@ End::</textarea>
             const jumper = document.getElementById('section-jumper');
             jumper.innerHTML = '<option value="">-- Jump to Section --</option>';
 
-            const yellowDB = JSON.parse(localStorage.getItem('frst_yellow_db')) || [];
+            const yellowDB = safeGetStorage('frst_yellow_db', []);
             const fragment = document.createDocumentFragment();
 
             currentLogLines.forEach((line, index) => {
                 const lineEl = document.createElement('div');
                 lineEl.id = `log-L${index}`;
                 
-                // Track headers for smooth scrolling section anchors
                 if (line.startsWith('====================') && line.trim().endsWith('====================')) {
                     const cleanTitle = line.replace(/=/g, '').trim();
                     const opt = document.createElement('option');
@@ -410,7 +415,6 @@ End::</textarea>
 
                 let safeLine = line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
                 
-                // Prioritize checking custom database keywords first
                 let matchesYellow = yellowDB.some(keyword => line.toLowerCase().includes(keyword.toLowerCase()));
 
                 if (matchesYellow && line.trim() !== '') {
@@ -423,7 +427,6 @@ End::</textarea>
 
                 lineEl.innerHTML = safeLine || '&nbsp;';
                 
-                // Append clickable purple number cleanly to the end of the line element
                 const numSpan = document.createElement('span');
                 numSpan.className = 'line-num';
                 numSpan.textContent = `[${index + 1}]`;
@@ -464,13 +467,11 @@ End::</textarea>
             }
         }
 
-        // Smart text insertion engine for fixlist generation
         function appendLineToFixlist(line) {
             if(!line.trim()) return;
             const fixArea = document.getElementById('fixlist-area');
             let currentText = fixArea.value;
 
-            // Inserts text dynamically into target workspace right above the '---' break rule
             if (currentText.includes('---')) {
                 currentText = currentText.replace('---', line.trim() + '\n---');
             } else if (currentText.includes('End::')) {
@@ -526,7 +527,6 @@ End::</textarea>
             });
         }
 
-        /* STORAGE & DYNAMIC DATABASE MANAGERS */
         function openHelperModal() {
             loadHelperEntries();
             renderDatabaseKeywords();
@@ -538,10 +538,10 @@ End::</textarea>
             const keyword = inputEl.value.trim();
             if(!keyword) return;
 
-            let db = JSON.parse(localStorage.getItem('frst_yellow_db')) || [];
+            let db = safeGetStorage('frst_yellow_db', []);
             if(!db.includes(keyword)) {
                 db.push(keyword);
-                localStorage.setItem('frst_yellow_db', JSON.stringify(db));
+                safeSetStorage('frst_yellow_db', db);
             }
             inputEl.value = '';
             renderDatabaseKeywords();
@@ -549,6 +549,36 @@ End::</textarea>
 
         function renderDatabaseKeywords() {
             const holder = document.getElementById('db-keywords-holder');
-            let db = JSON.parse(localStorage.getItem('frst_yellow_db')) || [];
+            let db = safeGetStorage('frst_yellow_db', []);
             if(db.length === 0) {
-                holder.innerHTML = '<p style="font-size:11px; color:#666;
+                holder.innerHTML = '<p style="font-size:11px; color:#666; margin:0;">Database empty.</p>';
+                return;
+            }
+            let html = '';
+            db.forEach(item => {
+                html += `
+                    <div class="helper-section">
+                        <div class="helper-title">
+                            <span>📂 ${escapeHTML(item.section)}</span>
+                            <span class="delete-btn" onclick="deleteHelperEntry(${item.id})">❌ Delete</span>
+                        </div>
+                        <div class="helper-body" onclick="document.execCommand('copy')">${escapeHTML(item.content)}</div>
+                    </div>
+                `;
+            });
+            displayBox.innerHTML = html;
+        }
+
+        function deleteHelperEntry(id) {
+            let items = safeGetStorage('frst_helper_items', []);
+            items = items.filter(item => item.id !== id);
+            safeSetStorage('frst_helper_items', items);
+            loadHelperEntries();
+        }
+
+        function escapeHTML(str) {
+            return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        }
+    </script>
+</body>
+</html>
