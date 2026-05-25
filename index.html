@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FRST Log Analyzer</title>
+    <title>FRST Log Analyzer Pro</title>
     <style>
         :root {
             --bg-color: #1e1e1e;
@@ -12,7 +12,8 @@
             --primary-color: #007acc;
             --border-color: #444;
             --attention-color: #ff5555;
-            --nofile-color: #888888;
+            --nofile-color: #00ff66; /* Changed to Green */
+            --suspicious-color: #ff9900; /* Suspicious items color */
         }
 
         body {
@@ -22,18 +23,49 @@
             background-color: var(--bg-color);
             color: var(--text-color);
             font-size: 14px;
+            padding-bottom: 80px; /* Space for sticky buttons */
         }
 
-        /* Input section */
+        /* Controls Area */
+        .input-group {
+            background: var(--container-bg);
+            padding: 10px;
+            border-radius: 4px;
+            border: 1px solid var(--border-color);
+            margin-bottom: 10px;
+        }
+
         textarea#log-input {
             width: 100%;
-            height: 100px;
-            background: var(--container-bg);
+            height: 80px;
+            background: #111;
             color: var(--text-color);
             border: 1px solid var(--border-color);
             padding: 10px;
             box-sizing: border-box;
             border-radius: 4px;
+            resize: vertical;
+        }
+
+        .file-input-wrapper {
+            margin-top: 8px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        .custom-file-upload {
+            background: #444;
+            padding: 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            display: inline-block;
+            border: 1px solid var(--border-color);
         }
 
         button {
@@ -45,41 +77,40 @@
             cursor: pointer;
             font-weight: bold;
             font-size: 16px;
-            width: 100%;
-            margin-top: 10px;
-            margin-bottom: 10px;
         }
 
-        button:active {
-            opacity: 0.8;
-        }
+        button:active { opacity: 0.8; }
+        .btn-block { width: 100%; margin-top: 10px; }
 
-        /* Log Display - No wrap, horizontal scroll */
+        /* Log Display */
         #log-display {
             background: var(--container-bg);
             border: 1px solid var(--border-color);
             padding: 10px;
-            white-space: pre; /* Forces no word wrap */
-            overflow-x: auto; /* Enables horizontal scrolling */
+            white-space: pre; 
+            overflow-x: auto; 
             min-height: 50vh;
             border-radius: 4px;
             user-select: text;
         }
 
+        /* Highlighting Styles */
         .hl-attention { color: var(--attention-color); font-weight: bold; }
-        .hl-nofile { color: var(--nofile-color); font-style: italic; }
+        .hl-nofile { color: var(--nofile-color); font-weight: bold; }
+        .hl-suspicious { color: var(--suspicious-color); font-weight: bold; text-decoration: underline; }
 
-        /* Floating Tools Button */
-        #tools-btn {
+        /* Action Footer for Mobile */
+        .footer-nav {
             position: fixed;
-            bottom: 20px;
-            right: 20px;
-            width: auto;
-            padding: 15px 25px;
-            border-radius: 50px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            bottom: 0; left: 0; right: 0;
+            background: #111;
+            padding: 10px;
+            display: flex;
+            gap: 10px;
+            box-shadow: 0 -4px 10px rgba(0,0,0,0.5);
             z-index: 100;
         }
+        .footer-nav button { flex: 1; margin: 0; }
 
         /* Modals */
         .modal {
@@ -97,24 +128,26 @@
             background: var(--bg-color);
             padding: 20px;
             border-radius: 8px;
-            width: 90%;
-            max-width: 400px;
+            width: 92%;
+            max-width: 450px;
+            max-height: 85vh;
+            overflow-y: auto;
             border: 1px solid var(--border-color);
             position: relative;
+            box-sizing: border-box;
         }
 
         .close-btn {
             position: absolute;
-            top: 10px;
-            right: 15px;
-            font-size: 24px;
+            top: 10px; right: 15px;
+            font-size: 28px;
             cursor: pointer;
-            color: white;
+            color: #aaa;
             font-family: sans-serif;
-            font-weight: bold;
         }
+        .close-btn:hover { color: white; }
 
-        input[type="text"] {
+        input[type="text"], select, textarea.form-control {
             width: 100%;
             padding: 12px;
             background: var(--container-bg);
@@ -123,7 +156,8 @@
             border-radius: 4px;
             box-sizing: border-box;
             font-size: 16px;
-            margin-top: 10px;
+            margin-top: 8px;
+            margin-bottom: 12px;
         }
 
         textarea#results-area {
@@ -136,42 +170,134 @@
             box-sizing: border-box;
             white-space: pre;
             overflow-x: auto;
-            margin-top: 10px;
+        }
+
+        /* Helper GUI Elements */
+        .helper-section {
+            border: 1px solid #444;
+            background: #252525;
+            padding: 10px;
+            margin-bottom: 15px;
+            border-radius: 4px;
+        }
+        .helper-title {
+            font-weight: bold;
+            color: var(--primary-color);
+            margin-bottom: 5px;
+            display: flex;
+            justify-content: space-between;
+        }
+        .helper-body {
+            white-space: pre-wrap;
+            background: #111;
+            padding: 8px;
+            border-radius: 4px;
+            font-size: 13px;
+            word-break: break-all;
+            user-select: all; /* Easy copy on click */
+        }
+        .delete-btn {
+            color: #ff5555;
+            cursor: pointer;
+            font-size: 12px;
         }
     </style>
 </head>
 <body>
 
-    <textarea id="log-input" placeholder="Paste FRST log here..."></textarea>
-    <button onclick="renderLog()">Load Log</button>
+    <div class="input-group">
+        <textarea id="log-input" placeholder="Paste FRST log here..."></textarea>
+        <div class="file-input-wrapper">
+            <label class="custom-file-upload">
+                <input type="file" id="file-picker" accept=".txt" onchange="handleFileUpload()">
+                📁 Upload .txt Log
+            </label>
+            <span id="file-name" style="font-size:12px; color:#888;">No file selected</span>
+        </div>
+        <button class="btn-block" onclick="renderLog()">Process & Load Log</button>
+    </div>
 
-    <div id="log-display">Log will appear here...</div>
+    <div id="log-display">Log data will render here...</div>
 
-    <button id="tools-btn" onclick="openModal('tools-modal')">🛠️ Tools</button>
+    <div class="footer-nav">
+        <button onclick="openModal('tools-modal')">🛠️ Tools</button>
+        <button style="background-color: #2b8a3e;" onclick="openHelperModal()">📋 Helper GUI</button>
+    </div>
 
     <div id="tools-modal" class="modal">
         <div class="modal-content">
             <span class="close-btn" onclick="closeModal('tools-modal')">&times;</span>
-            <h2>Tools</h2>
-            <p>Enter instruction (e.g., <i>No File</i>, <i>ATTENTION</i>, or <i>Add: Keyword</i>):</p>
-            <input type="text" id="tool-instruction" placeholder="Enter command...">
-            <button onclick="processInstruction()">Process</button>
+            <h2>Tools Extraction</h2>
+            <p>Type exactly <b>No File</b> or <b>ATTENTION</b> to grab matching lines.</p>
+            <input type="text" id="tool-instruction" placeholder="No File / ATTENTION">
+            <button class="btn-block" onclick="processInstruction()">Extract Lines</button>
         </div>
     </div>
 
     <div id="results-modal" class="modal">
         <div class="modal-content">
             <span class="close-btn" onclick="closeModal('results-modal')">&times;</span>
-            <h2>Results</h2>
+            <h2>Extracted Results</h2>
             <textarea id="results-area" readonly></textarea>
-            <button id="copy-btn" onclick="copyResults()">Copy All</button>
+            <button id="copy-btn" class="btn-block" onclick="copyResults()">Copy All</button>
+        </div>
+    </div>
+
+    <div id="helper-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn" onclick="closeModal('helper-modal')">&times;</span>
+            <h2>Helper Notes Storage</h2>
+            
+            <div style="border: 1px dashed #555; padding: 10px; margin-bottom: 15px; border-radius:4px;">
+                <label><b>Section Title:</b></label>
+                <input type="text" id="helper-input-section" placeholder="e.g., Fixlist Commands, Script Notes">
+                <label><b>Saved Content:</b></label>
+                <textarea id="helper-input-text" class="form-control" style="height:80px;" placeholder="Paste commands or text to permanently keep here..."></textarea>
+                <button class="btn-block" onclick="saveHelperEntry()">Save & Permanent Add</button>
+            </div>
+
+            <h3>Your Saved Sections</h3>
+            <div id="helper-saved-list"></div>
         </div>
     </div>
 
     <script>
         let currentLogLines = [];
 
-        // Renders log and applies highlighting
+        // Handle .txt file processing
+        function handleFileUpload() {
+            const fileInput = document.getElementById('file-picker');
+            const fileNameDisplay = document.getElementById('file-name');
+            if (fileInput.files.length === 0) return;
+
+            const file = fileInput.files[0];
+            fileNameDisplay.innerText = file.name;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                document.getElementById('log-input').value = e.target.result;
+            };
+            reader.readAsText(file);
+        }
+
+        // Automated Heuristics Engine for Suspicious Objects
+        function isSuspiciousLine(line) {
+            // 1. Match randomized suspicious 2-letter executables (e.g., bb.exe, vv.exe, xq.exe)
+            if (/\b[a-z]{2}\.exe\b/i.test(line)) return true;
+
+            // 2. Match temporary file execution strings (e.g., random chars inside AppData/Temp)
+            if (/\\AppData\\Local\\Temp\\.*\.(exe|dll|bat|vbs|cmd)/i.test(line)) return true;
+
+            // 3. Match randomized alphabetic files typically seen in malware logs (e.g., 4-8 mixed digits/letters)
+            if (/\b[a-z0-9]{5,10}\.(exe|tmp)\b/i.test(line) && (line.includes('Task:') || line.includes('HKLM') || line.includes('HKCU'))) return true;
+
+            // 4. Double extensions (e.g., document.pdf.exe)
+            if (/\.[a-z0-9]+\.(exe|vbs|bat|scr)$/i.test(line)) return true;
+
+            return false;
+        }
+
+        // Render log with customized highlighting rules
         function renderLog() {
             const rawText = document.getElementById('log-input').value;
             if (!rawText) return;
@@ -180,98 +306,118 @@
             let displayHTML = '';
 
             for (let line of currentLogLines) {
-                // Escape HTML tags for safety and rendering
                 let safeLine = line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
                 
                 if (safeLine.includes('ATTENTION')) {
                     displayHTML += `<span class="hl-attention">${safeLine}</span>\n`;
                 } else if (safeLine.includes('No File')) {
                     displayHTML += `<span class="hl-nofile">${safeLine}</span>\n`;
+                } else if (isSuspiciousLine(safeLine)) {
+                    displayHTML += `<span class="hl-suspicious">${safeLine}</span>\n`;
                 } else {
                     displayHTML += `${safeLine}\n`;
                 }
             }
             
             document.getElementById('log-display').innerHTML = displayHTML;
-            document.getElementById('log-input').style.display = 'none'; // Hide input to save space
+            // Compress inputs dynamically on mobile to maximize viewable screen space
+            document.querySelector('.input-group').style.display = 'none'; 
         }
 
-        // Modal Controls
+        // Standard Modal Window Managers
         function openModal(id) {
             document.getElementById(id).style.display = 'flex';
-            if(id === 'tools-modal') {
-                document.getElementById('tool-instruction').focus();
-            }
+            if(id === 'tools-modal') document.getElementById('tool-instruction').focus();
         }
 
         function closeModal(id) {
             document.getElementById(id).style.display = 'none';
         }
 
-        // Processing Logic
+        // Extraction filter
         function processInstruction() {
             const instruction = document.getElementById('tool-instruction').value.trim();
             if (!instruction) return;
-
-            let isAddMode = instruction.toLowerCase().startsWith('add:');
-            let searchTarget = isAddMode ? instruction.substring(4).trim() : instruction;
             
             let extractedLines = [];
-
             for (let line of currentLogLines) {
-                if (line.toLowerCase().includes(searchTarget.toLowerCase())) {
-                    if (isAddMode) {
-                        extractedLines.push(stripFRSTMetadata(line));
-                    } else {
-                        // Exact match requirement for specific keywords can be enforced here,
-                        // but `.includes` is generally safer for FRST logs.
-                        extractedLines.push(line);
-                    }
+                if (line.includes(instruction)) {
+                    extractedLines.push(line);
                 }
             }
 
             document.getElementById('results-area').value = extractedLines.join('\n');
             closeModal('tools-modal');
             openModal('results-modal');
-            
-            // Reset copy button text
             document.getElementById('copy-btn').innerText = 'Copy All';
         }
 
-        // Strips dates, times, and sizes from FRST lines
-        function stripFRSTMetadata(line) {
-            let cleaned = line;
-            
-            // 1. Strip standard beginning date/time/size stamps 
-            // Matches: "2023-10-25 14:32 - 2023-10-25 14:32 - 000000000 ____D "
-            cleaned = cleaned.replace(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2} - \d{4}-\d{2}-\d{2} \d{2}:\d{2} - \d+ ____[A-Z]?\s*/, '');
-            
-            // 2. Strip single date/time/size stamps (sometimes present)
-            // Matches: "2023-10-25 14:32 - 000000000 ____D "
-            cleaned = cleaned.replace(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2} - \d+ ____[A-Z]?\s*/, '');
-
-            // 3. Strip registry end signatures (Size and Date)
-            // Matches: " [12345 2023-10-25]"
-            cleaned = cleaned.replace(/\s*\[\d+\s+\d{4}-\d{2}-\d{2}\]$/, '');
-            
-            // 4. Strip registry end signatures (Just Size)
-            // Matches: " [12345]"
-            cleaned = cleaned.replace(/\s*\[\d+\]$/, '');
-
-            return cleaned;
-        }
-
-        // Copy functionality
         function copyResults() {
             const resultsArea = document.getElementById('results-area');
             resultsArea.select();
-            resultsArea.setSelectionRange(0, 99999); // For mobile devices
-            
+            resultsArea.setSelectionRange(0, 99999);
             navigator.clipboard.writeText(resultsArea.value).then(() => {
                 document.getElementById('copy-btn').innerText = 'Copied!';
-            }).catch(err => {
-                alert('Failed to copy. Please manually copy the text.');
             });
+        }
+
+        /* PERMANENT STORAGE HELPER ENGINE */
+        function openHelperModal() {
+            loadHelperEntries();
+            openModal('helper-modal');
+        }
+
+        function saveHelperEntry() {
+            const sectionTitle = document.getElementById('helper-input-section').value.trim() || 'General Snippet';
+            const textValue = document.getElementById('helper-input-text').value.trim();
+
+            if (!textValue) return;
+
+            let items = JSON.parse(localStorage.getItem('frst_helper_items')) || [];
+            items.push({ id: Date.now(), section: sectionTitle, content: textValue });
+            
+            localStorage.setItem('frst_helper_items', JSON.stringify(items));
+            
+            // Clear inputs
+            document.getElementById('helper-input-section').value = '';
+            document.getElementById('helper-input-text').value = '';
+            
+            loadHelperEntries();
+        }
+
+        function loadHelperEntries() {
+            const displayBox = document.getElementById('helper-saved-list');
+            let items = JSON.parse(localStorage.getItem('frst_helper_items')) || [];
+            
+            if(items.length === 0) {
+                displayBox.innerHTML = '<p style="color:#666; font-style:italic;">No saved entries yet.</p>';
+                return;
+            }
+
+            let html = '';
+            items.forEach(item => {
+                html += `
+                    <div class="helper-section">
+                        <div class="helper-title">
+                            <span>📂 ${escapeHTML(item.section)}</span>
+                            <span class="delete-btn" onclick="deleteHelperEntry(${item.id})">❌ Delete</span>
+                        </div>
+                        <div class="helper-body" onclick="document.execCommand('copy')">${escapeHTML(item.content)}</div>
+                    </div>
+                `;
+            });
+            displayBox.innerHTML = html;
+        }
+
+        function deleteHelperEntry(id) {
+            let items = JSON.parse(localStorage.getItem('frst_helper_items')) || [];
+            items = items.filter(item => item.id !== id);
+            localStorage.setItem('frst_helper_items', JSON.stringify(items));
+            loadHelperEntries();
+        }
+
+        function escapeHTML(str) {
+            return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
         }
     </script>
 </body>
