@@ -13,6 +13,8 @@
             --border-color: #444;
             --attention-color: #ff5555;
             --nofile-color: #00ff66;
+            --purple-num: #b55fe6; /* Purple for line numbers */
+            --yellow-flag: #ffff00; /* Yellow for database items */
         }
 
         body {
@@ -67,6 +69,25 @@
             border: 1px solid var(--border-color);
         }
 
+        #utility-bar {
+            display: none;
+            background: var(--container-bg);
+            padding: 6px;
+            margin-bottom: 8px;
+            border-radius: 4px;
+            border: 1px solid var(--border-color);
+            gap: 8px;
+        }
+        #utility-bar select, #utility-bar input {
+            flex: 1;
+            background: #111;
+            color: white;
+            border: 1px solid var(--border-color);
+            padding: 6px;
+            border-radius: 4px;
+            font-size: 11px;
+        }
+
         button {
             background-color: var(--primary-color);
             color: white;
@@ -92,14 +113,33 @@
             width: 100%;
             box-sizing: border-box;
             border-radius: 4px;
-            user-select: text;
             font-size: 11px; 
-            line-height: 1.3;
+            line-height: 1.4;
+        }
+
+        #log-display div {
+            padding: 2px 0;
+        }
+
+        /* Purple Line Numbers at the end of elements */
+        .line-num {
+            color: var(--purple-num);
+            font-weight: bold;
+            cursor: pointer;
+            margin-left: 12px;
+            display: inline-block;
+            user-select: none;
+            padding: 0 4px;
+        }
+        .line-num:active {
+            background: #444;
+            border-radius: 3px;
         }
 
         /* Highlighting Styles */
         .hl-attention { color: var(--attention-color); font-weight: bold; }
         .hl-nofile { color: var(--nofile-color); font-weight: bold; }
+        .hl-yellow { color: var(--yellow-flag); font-weight: bold; background-color: rgba(255, 255, 0, 0.1); }
 
         /* Action Footer for Mobile */
         .footer-nav {
@@ -108,11 +148,11 @@
             background: #111;
             padding: 10px;
             display: flex;
-            gap: 10px;
+            gap: 6px;
             box-shadow: 0 -4px 10px rgba(0,0,0,0.5);
             z-index: 100;
         }
-        .footer-nav button { flex: 1; margin: 0; }
+        .footer-nav button { flex: 1; margin: 0; font-size: 13px; padding: 10px 4px; }
 
         /* Modals */
         .modal {
@@ -147,7 +187,6 @@
             color: #aaa;
             font-family: sans-serif;
         }
-        .close-btn:hover { color: white; }
 
         input[type="text"], textarea.form-control {
             width: 100%;
@@ -162,9 +201,9 @@
             margin-bottom: 12px;
         }
 
-        textarea#results-area {
+        textarea.output-box {
             width: 100%;
-            height: 250px;
+            height: 240px;
             background: var(--container-bg);
             color: white;
             border: 1px solid var(--border-color);
@@ -175,12 +214,12 @@
             font-size: 11px;
         }
 
-        /* Helper GUI Elements */
+        /* Helper GUI Sections */
         .helper-section {
             border: 1px solid #444;
             background: #252525;
             padding: 10px;
-            margin-bottom: 15px;
+            margin-bottom: 12px;
             border-radius: 4px;
         }
         .helper-title {
@@ -200,14 +239,35 @@
             word-break: break-all;
             user-select: all;
         }
-        .delete-btn {
-            color: #ff5555;
-            cursor: pointer;
+        .delete-btn { color: #ff5555; cursor: pointer; font-size: 12px; }
+        
+        #toast {
+            display: none;
+            position: fixed;
+            top: 20px; left: 50%;
+            transform: translateX(-50%);
+            background: var(--purple-num);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: bold;
+            z-index: 300;
             font-size: 12px;
+        }
+        .db-tag {
+            display: inline-block;
+            background: #444;
+            color: var(--yellow-flag);
+            padding: 4px 8px;
+            border-radius: 4px;
+            margin: 4px;
+            font-size: 11px;
         }
     </style>
 </head>
 <body>
+
+    <div id="toast">Added to Fixlist</div>
 
     <div class="input-group">
         <textarea id="log-input" placeholder="Paste FRST log here..."></textarea>
@@ -221,10 +281,18 @@
         <button class="btn-block" onclick="renderLog()">Process & Load Log</button>
     </div>
 
+    <div id="utility-bar">
+        <select id="section-jumper" onchange="jumpToSection()">
+            <option value="">-- Jump to Section --</option>
+        </select>
+        <input type="text" id="live-filter" placeholder="🔍 Filter log view..." oninput="filterLogView()">
+    </div>
+
     <div id="log-display">Log data will render here...</div>
 
     <div class="footer-nav">
         <button onclick="openModal('tools-modal')">🛠️ Tools</button>
+        <button style="background-color: #e67e22;" onclick="openModal('fixlist-modal')">📝 View Fixlist</button>
         <button style="background-color: #2b8a3e;" onclick="openHelperModal()">📋 Helper GUI</button>
     </div>
 
@@ -242,21 +310,49 @@
         <div class="modal-content">
             <span class="close-btn" onclick="closeModal('results-modal')">&times;</span>
             <h2>Extracted Results</h2>
-            <textarea id="results-area" readonly></textarea>
-            <button id="copy-btn" class="btn-block" onclick="copyResults()">Copy All</button>
+            <textarea id="results-area" class="output-box" readonly></textarea>
+            <button id="copy-btn" class="btn-block" onclick="copyResults('results-area', 'copy-btn')">Copy All</button>
+        </div>
+    </div>
+
+    <div id="fixlist-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn" onclick="closeModal('fixlist-modal')">&times;</span>
+            <h2>Fixlist</h2>
+            <textarea id="fixlist-area" class="output-box">Start::
+SystemRestore: On
+CreateRestorePoint:
+CloseProcesses:
+
+
+---
+
+EmptyTemp:
+Hosts:
+End::</textarea>
+            <button id="copy-fix-btn" class="btn-block" style="background-color:#e67e22;" onclick="copyResults('fixlist-area', 'copy-fix-btn')">Copy All</button>
+            <button class="btn-block" style="background-color:#555; margin-top:5px;" onclick="clearFixlist()">Reset Template</button>
         </div>
     </div>
 
     <div id="helper-modal" class="modal">
         <div class="modal-content">
             <span class="close-btn" onclick="closeModal('helper-modal')">&times;</span>
-            <h2>Helper Notes Storage</h2>
             
+            <h2>Flag Yellow Database</h2>
+            <div style="border: 1px dashed var(--yellow-flag); padding: 10px; margin-bottom: 20px; border-radius:4px;">
+                <label><b>Enter Target Path / Keyword:</b></label>
+                <input type="text" id="db-keyword-input" placeholder="e.g., AppData\Local\RenPy">
+                <button class="btn-block" style="background-color: #f39c12;" onclick="saveDatabaseKeyword()">Add to Database</button>
+                <div id="db-keywords-holder" style="margin-top: 10px;"></div>
+            </div>
+
+            <h2>Helper Notes Storage</h2>
             <div style="border: 1px dashed #555; padding: 10px; margin-bottom: 15px; border-radius:4px;">
                 <label><b>Section Title:</b></label>
-                <input type="text" id="helper-input-section" placeholder="e.g., Fixlist Commands, Script Notes">
+                <input type="text" id="helper-input-section" placeholder="e.g., Extra Commands">
                 <label><b>Saved Content:</b></label>
-                <textarea id="helper-input-text" class="form-control" style="height:80px;" placeholder="Paste commands or text to permanently keep here..."></textarea>
+                <textarea id="helper-input-text" class="form-control" style="height:70px;" placeholder="Paste text here..."></textarea>
                 <button class="btn-block" onclick="saveHelperEntry()">Save & Permanent Add</button>
             </div>
 
@@ -267,8 +363,8 @@
 
     <script>
         let currentLogLines = [];
+        const initialFixlistTemplate = `Start::\nSystemRestore: On\nCreateRestorePoint:\nCloseProcesses:\n\n\n---\n\nEmptyTemp:\nHosts:\nEnd::`;
 
-        // Handle .txt file processing
         function handleFileUpload() {
             const fileInput = document.getElementById('file-picker');
             const fileNameDisplay = document.getElementById('file-name');
@@ -284,31 +380,117 @@
             reader.readAsText(file);
         }
 
-        // Render log
+        // Render log lines with clean styling rules
         function renderLog() {
             const rawText = document.getElementById('log-input').value;
             if (!rawText) return;
             
             currentLogLines = rawText.split('\n');
-            let displayHTML = '';
+            const displayEl = document.getElementById('log-display');
+            displayEl.innerHTML = ''; 
+            
+            const jumper = document.getElementById('section-jumper');
+            jumper.innerHTML = '<option value="">-- Jump to Section --</option>';
 
-            for (let line of currentLogLines) {
+            const yellowDB = JSON.parse(localStorage.getItem('frst_yellow_db')) || [];
+            const fragment = document.createDocumentFragment();
+
+            currentLogLines.forEach((line, index) => {
+                const lineEl = document.createElement('div');
+                lineEl.id = `log-L${index}`;
+                
+                // Track headers for smooth scrolling section anchors
+                if (line.startsWith('====================') && line.trim().endsWith('====================')) {
+                    const cleanTitle = line.replace(/=/g, '').trim();
+                    const opt = document.createElement('option');
+                    opt.value = `log-L${index}`;
+                    opt.textContent = cleanTitle;
+                    jumper.appendChild(opt);
+                }
+
                 let safeLine = line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
                 
-                if (safeLine.includes('ATTENTION')) {
-                    displayHTML += `<span class="hl-attention">${safeLine}</span>\n`;
+                // Prioritize checking custom database keywords first
+                let matchesYellow = yellowDB.some(keyword => line.toLowerCase().includes(keyword.toLowerCase()));
+
+                if (matchesYellow && line.trim() !== '') {
+                    lineEl.className = 'hl-yellow';
+                } else if (safeLine.includes('ATTENTION')) {
+                    lineEl.className = 'hl-attention';
                 } else if (safeLine.includes('No File')) {
-                    displayHTML += `<span class="hl-nofile">${safeLine}</span>\n`;
-                } else {
-                    displayHTML += `${safeLine}\n`;
+                    lineEl.className = 'hl-nofile';
                 }
-            }
+
+                lineEl.innerHTML = safeLine || '&nbsp;';
+                
+                // Append clickable purple number cleanly to the end of the line element
+                const numSpan = document.createElement('span');
+                numSpan.className = 'line-num';
+                numSpan.textContent = `[${index + 1}]`;
+                numSpan.onclick = function(e) {
+                    e.stopPropagation();
+                    appendLineToFixlist(line);
+                };
+
+                lineEl.appendChild(numSpan);
+                fragment.appendChild(lineEl);
+            });
             
-            document.getElementById('log-display').innerHTML = displayHTML;
+            displayEl.appendChild(fragment);
             document.querySelector('.input-group').style.display = 'none'; 
+            document.getElementById('utility-bar').style.display = 'flex';
         }
 
-        // Standard Modal Window Managers
+        function jumpToSection() {
+            const targetId = document.getElementById('section-jumper').value;
+            if (!targetId) return;
+            const targetEl = document.getElementById(targetId);
+            if (targetEl) {
+                targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }
+
+        function filterLogView() {
+            const query = document.getElementById('live-filter').value.toLowerCase();
+            const logContainer = document.getElementById('log-display');
+            const lines = logContainer.getElementsByTagName('div');
+
+            for (let i = 0; i < lines.length; i++) {
+                if (lines[i].textContent.toLowerCase().includes(query)) {
+                    lines[i].style.display = '';
+                } else {
+                    lines[i].style.display = 'none';
+                }
+            }
+        }
+
+        // Smart text insertion engine for fixlist generation
+        function appendLineToFixlist(line) {
+            if(!line.trim()) return;
+            const fixArea = document.getElementById('fixlist-area');
+            let currentText = fixArea.value;
+
+            // Inserts text dynamically into target workspace right above the '---' break rule
+            if (currentText.includes('---')) {
+                currentText = currentText.replace('---', line.trim() + '\n---');
+            } else if (currentText.includes('End::')) {
+                currentText = currentText.replace('End::', line.trim() + '\nEnd::');
+            } else {
+                currentText += '\n' + line.trim();
+            }
+            fixArea.value = currentText;
+
+            const toast = document.getElementById('toast');
+            toast.style.display = 'block';
+            setTimeout(() => { toast.style.display = 'none'; }, 1000);
+        }
+
+        function clearFixlist() {
+            if(confirm("Reset fixlist container workspace back to default template layout?")) {
+                document.getElementById('fixlist-area').value = initialFixlistTemplate;
+            }
+        }
+
         function openModal(id) {
             document.getElementById(id).style.display = 'flex';
             if(id === 'tools-modal') document.getElementById('tool-instruction').focus();
@@ -318,7 +500,6 @@
             document.getElementById(id).style.display = 'none';
         }
 
-        // Extraction filter
         function processInstruction() {
             const instruction = document.getElementById('tool-instruction').value.trim();
             if (!instruction) return;
@@ -336,72 +517,38 @@
             document.getElementById('copy-btn').innerText = 'Copy All';
         }
 
-        function copyResults() {
-            const resultsArea = document.getElementById('results-area');
+        function copyResults(textareaId, buttonId) {
+            const resultsArea = document.getElementById(textareaId);
             resultsArea.select();
             resultsArea.setSelectionRange(0, 99999);
             navigator.clipboard.writeText(resultsArea.value).then(() => {
-                document.getElementById('copy-btn').innerText = 'Copied!';
+                document.getElementById(buttonId).innerText = 'Copied!';
             });
         }
 
-        /* PERMANENT STORAGE HELPER ENGINE */
+        /* STORAGE & DYNAMIC DATABASE MANAGERS */
         function openHelperModal() {
             loadHelperEntries();
+            renderDatabaseKeywords();
             openModal('helper-modal');
         }
 
-        function saveHelperEntry() {
-            const sectionTitle = document.getElementById('helper-input-section').value.trim() || 'General Snippet';
-            const textValue = document.getElementById('helper-input-text').value.trim();
+        function saveDatabaseKeyword() {
+            const inputEl = document.getElementById('db-keyword-input');
+            const keyword = inputEl.value.trim();
+            if(!keyword) return;
 
-            if (!textValue) return;
-
-            let items = JSON.parse(localStorage.getItem('frst_helper_items')) || [];
-            items.push({ id: Date.now(), section: sectionTitle, content: textValue });
-            
-            localStorage.setItem('frst_helper_items', JSON.stringify(items));
-            
-            document.getElementById('helper-input-section').value = '';
-            document.getElementById('helper-input-text').value = '';
-            
-            loadHelperEntries();
-        }
-
-        function loadHelperEntries() {
-            const displayBox = document.getElementById('helper-saved-list');
-            let items = JSON.parse(localStorage.getItem('frst_helper_items')) || [];
-            
-            if(items.length === 0) {
-                displayBox.innerHTML = '<p style="color:#666; font-style:italic;">No saved entries yet.</p>';
-                return;
+            let db = JSON.parse(localStorage.getItem('frst_yellow_db')) || [];
+            if(!db.includes(keyword)) {
+                db.push(keyword);
+                localStorage.setItem('frst_yellow_db', JSON.stringify(db));
             }
-
-            let html = '';
-            items.forEach(item => {
-                html += `
-                    <div class="helper-section">
-                        <div class="helper-title">
-                            <span>📂 ${escapeHTML(item.section)}</span>
-                            <span class="delete-btn" onclick="deleteHelperEntry(${item.id})">❌ Delete</span>
-                        </div>
-                        <div class="helper-body" onclick="document.execCommand('copy')">${escapeHTML(item.content)}</div>
-                    </div>
-                `;
-            });
-            displayBox.innerHTML = html;
+            inputEl.value = '';
+            renderDatabaseKeywords();
         }
 
-        function deleteHelperEntry(id) {
-            let items = JSON.parse(localStorage.getItem('frst_helper_items')) || [];
-            items = items.filter(item => item.id !== id);
-            localStorage.setItem('frst_helper_items', JSON.stringify(items));
-            loadHelperEntries();
-        }
-
-        function escapeHTML(str) {
-            return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-        }
-    </script>
-</body>
-</html>
+        function renderDatabaseKeywords() {
+            const holder = document.getElementById('db-keywords-holder');
+            let db = JSON.parse(localStorage.getItem('frst_yellow_db')) || [];
+            if(db.length === 0) {
+                holder.innerHTML = '<p style="font-size:11px; color:#666;
