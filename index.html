@@ -15,6 +15,7 @@
             --nofile-color: #00ff66;
             --purple-num: #b55fe6;
             --yellow-flag: #ffff00;
+            --orange-flag: #ff7700; /* Orange for malicious database items */
         }
 
         body {
@@ -54,7 +55,6 @@
             align-items: center;
         }
 
-        /* PATCH: Visually hidden instead of display: none for mobile compatibility */
         input[type="file"] {
             position: absolute;
             width: 1px;
@@ -136,9 +136,11 @@
         }
         .line-num:active { background: #444; border-radius: 3px; }
 
+        /* Highlight Rules */
         .hl-attention { color: var(--attention-color); font-weight: bold; }
         .hl-nofile { color: var(--nofile-color); font-weight: bold; }
-        .hl-yellow { color: var(--yellow-flag); font-weight: bold; background-color: rgba(255, 255, 0, 0.1); }
+        .hl-yellow { color: var(--yellow-flag); font-weight: bold; background-color: rgba(255, 255, 0, 0.08); }
+        .hl-orange { color: var(--orange-flag); font-weight: bold; background-color: rgba(255, 119, 0, 0.12); }
 
         .footer-nav {
             position: fixed;
@@ -253,12 +255,13 @@
         .db-tag {
             display: inline-block;
             background: #444;
-            color: var(--yellow-flag);
             padding: 4px 8px;
             border-radius: 4px;
             margin: 4px;
             font-size: 11px;
         }
+        .db-tag-orange { color: var(--orange-flag); border: 1px solid var(--orange-flag); }
+        .db-tag-yellow { color: var(--yellow-flag); border: 1px solid var(--yellow-flag); }
     </style>
 </head>
 <body>
@@ -335,12 +338,17 @@ End::</textarea>
         <div class="modal-content">
             <span class="close-btn" onclick="closeModal('helper-modal')">&times;</span>
             
-            <h2>Flag Yellow Database</h2>
-            <div style="border: 1px dashed var(--yellow-flag); padding: 10px; margin-bottom: 20px; border-radius:4px;">
+            <h2>Flagging Databases</h2>
+            <div style="border: 1px dashed #666; padding: 10px; margin-bottom: 20px; border-radius:4px;">
                 <label><b>Enter Target Path / Keyword:</b></label>
                 <input type="text" id="db-keyword-input" placeholder="e.g., AppData\Local\RenPy">
-                <button class="btn-block" style="background-color: #f39c12;" onclick="saveDatabaseKeyword()">Add to Database</button>
-                <div id="db-keywords-holder" style="margin-top: 10px;"></div>
+                
+                <div style="display:flex; gap:10px; margin-top:5px;">
+                    <button style="flex:1; background-color: #f39c12; font-size:13px; padding:10px;" onclick="saveDatabaseKeyword('yellow')">Flag Yellow</button>
+                    <button style="flex:1; background-color: #d35400; font-size:13px; padding:10px;" onclick="saveDatabaseKeyword('orange')">Flag Orange 🌟</button>
+                </div>
+                
+                <div id="db-keywords-holder" style="margin-top:15px;"></div>
             </div>
 
             <h2>Helper Notes Storage</h2>
@@ -361,14 +369,13 @@ End::</textarea>
         let currentLogLines = [];
         const initialFixlistTemplate = `Start::\nSystemRestore: On\nCreateRestorePoint:\nCloseProcesses:\n\n\n---\n\nEmptyTemp:\nHosts:\nEnd::`;
 
-        // PATCH: Safe LocalStorage wrappers to prevent mobile script crashes
         function safeGetStorage(key, defaultVal) {
             try { return JSON.parse(localStorage.getItem(key)) || defaultVal; } 
             catch (e) { return defaultVal; }
         }
         function safeSetStorage(key, val) {
             try { localStorage.setItem(key, JSON.stringify(val)); } 
-            catch (e) { console.warn("Storage restricted on this device."); }
+            catch (e) { console.warn("Storage restricted."); }
         }
 
         function handleFileUpload() {
@@ -382,9 +389,32 @@ End::</textarea>
             const reader = new FileReader();
             reader.onload = function(e) {
                 document.getElementById('log-input').value = e.target.result;
-                renderLog(); // Auto-load the log instantly!
+                renderLog();
             };
             reader.readAsText(file);
+        }
+
+        // Smart Logic Engine: Strips FRST preamble timestamps, attributes, and trailing brackets
+        function extractFrstCorePath(line) {
+            let cleaned = line.trim();
+
+            // 1. Strip double timestamps + sizes + attributes (e.g., "2026-05-25 12:00 - 2026-05-25 12:01 - 000123456 ____A C:\path")
+            cleaned = cleaned.replace(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2} - \d{4}-\d{2}-\d{2} \d{2}:\d{2} - \d+ [_\w\-]{5}\s?([A-Z]:\\)/i, '$1');
+            cleaned = cleaned.replace(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2} - \d{4}-\d{2}-\d{2} \d{2}:\d{2} - \d+ [_\w\-]{5}\s+/, '');
+
+            // 2. Strip single timestamps + sizes + attributes (e.g., "2026-05-25 12:00 - 000123456 ____A C:\path")
+            cleaned = cleaned.replace(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2} - \d+ [_\w\-]{5}\s?([A-Z]:\\)/i, '$1');
+            cleaned = cleaned.replace(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2} - \d+ [_\w\-]{5}\s+/, '');
+
+            // 3. Strip basic lone timestamps from registry/services lines (e.g., "2026-05-25 12:00 - RunKey")
+            cleaned = cleaned.replace(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2} - \s*/, '');
+
+            // 4. Strip trailing system brackets completely (e.g., "[12345 2026-05-25]", "[12345]", or MD5/SHA hashes in brackets)
+            cleaned = cleaned.replace(/\s*\[\d+\s+\d{4}-\d{2}-\d{2}\]$/, '');
+            cleaned = cleaned.replace(/\s*\[\d+\]$/, '');
+            cleaned = cleaned.replace(/\s*\[[A-Fa-f0-9]{32,64}\]$/, '');
+
+            return cleaned;
         }
 
         function renderLog() {
@@ -399,6 +429,7 @@ End::</textarea>
             jumper.innerHTML = '<option value="">-- Jump to Section --</option>';
 
             const yellowDB = safeGetStorage('frst_yellow_db', []);
+            const orangeDB = safeGetStorage('frst_orange_db', []);
             const fragment = document.createDocumentFragment();
 
             currentLogLines.forEach((line, index) => {
@@ -415,9 +446,12 @@ End::</textarea>
 
                 let safeLine = line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
                 
+                let matchesOrange = orangeDB.some(keyword => line.toLowerCase().includes(keyword.toLowerCase()));
                 let matchesYellow = yellowDB.some(keyword => line.toLowerCase().includes(keyword.toLowerCase()));
 
-                if (matchesYellow && line.trim() !== '') {
+                if (matchesOrange && line.trim() !== '') {
+                    lineEl.className = 'hl-orange';
+                } else if (matchesYellow && line.trim() !== '') {
                     lineEl.className = 'hl-yellow';
                 } else if (safeLine.includes('ATTENTION')) {
                     lineEl.className = 'hl-attention';
@@ -432,7 +466,9 @@ End::</textarea>
                 numSpan.textContent = `[${index + 1}]`;
                 numSpan.onclick = function(e) {
                     e.stopPropagation();
-                    appendLineToFixlist(line);
+                    // Extract only the path/task payload before moving to fixlist
+                    let corePayload = extractFrstCorePath(line);
+                    appendLineToFixlist(corePayload);
                 };
 
                 lineEl.appendChild(numSpan);
@@ -467,17 +503,17 @@ End::</textarea>
             }
         }
 
-        function appendLineToFixlist(line) {
-            if(!line.trim()) return;
+        function appendLineToFixlist(cleanedLine) {
+            if(!cleanedLine.trim()) return;
             const fixArea = document.getElementById('fixlist-area');
             let currentText = fixArea.value;
 
             if (currentText.includes('---')) {
-                currentText = currentText.replace('---', line.trim() + '\n---');
+                currentText = currentText.replace('---', cleanedLine.trim() + '\n---');
             } else if (currentText.includes('End::')) {
-                currentText = currentText.replace('End::', line.trim() + '\nEnd::');
+                currentText = currentText.replace('End::', cleanedLine.trim() + '\nEnd::');
             } else {
-                currentText += '\n' + line.trim();
+                currentText += '\n' + cleanedLine.trim();
             }
             fixArea.value = currentText;
 
@@ -533,15 +569,17 @@ End::</textarea>
             openModal('helper-modal');
         }
 
-        function saveDatabaseKeyword() {
+        function saveDatabaseKeyword(color) {
             const inputEl = document.getElementById('db-keyword-input');
             const keyword = inputEl.value.trim();
             if(!keyword) return;
 
-            let db = safeGetStorage('frst_yellow_db', []);
+            let storageKey = color === 'orange' ? 'frst_orange_db' : 'frst_yellow_db';
+            let db = safeGetStorage(storageKey, []);
+            
             if(!db.includes(keyword)) {
                 db.push(keyword);
-                safeSetStorage('frst_yellow_db', db);
+                safeSetStorage(storageKey, db);
             }
             inputEl.value = '';
             renderDatabaseKeywords();
@@ -549,13 +587,58 @@ End::</textarea>
 
         function renderDatabaseKeywords() {
             const holder = document.getElementById('db-keywords-holder');
-            let db = safeGetStorage('frst_yellow_db', []);
-            if(db.length === 0) {
-                holder.innerHTML = '<p style="font-size:11px; color:#666; margin:0;">Database empty.</p>';
+            let yellowDb = safeGetStorage('frst_yellow_db', []);
+            let orangeDb = safeGetStorage('frst_orange_db', []);
+            
+            if(yellowDb.length === 0 && orangeDb.length === 0) {
+                holder.innerHTML = '<p style="font-size:11px; color:#666; margin:0;">Databases are currently empty.</p>';
                 return;
             }
+            
             let html = '';
-            db.forEach(item => {
+            yellowDb.forEach((keyword, idx) => {
+                html += `<span class="db-tag db-tag-yellow">${escapeHTML(keyword)} <b style="color:red; cursor:pointer; margin-left:6px;" onclick="deleteDatabaseKeyword('yellow', ${idx})">&times;</b></span>`;
+            });
+            orangeDb.forEach((keyword, idx) => {
+                html += `<span class="db-tag db-tag-orange">${escapeHTML(keyword)} <b style="color:red; cursor:pointer; margin-left:6px;" onclick="deleteDatabaseKeyword('orange', ${idx})">&times;</b></span>`;
+            });
+            holder.innerHTML = html;
+        }
+
+        function deleteDatabaseKeyword(color, index) {
+            let storageKey = color === 'orange' ? 'frst_orange_db' : 'frst_yellow_db';
+            let db = safeGetStorage(storageKey, []);
+            db.splice(index, 1);
+            safeSetStorage(storageKey, db);
+            renderDatabaseKeywords();
+        }
+
+        function saveHelperEntry() {
+            const sectionTitle = document.getElementById('helper-input-section').value.trim() || 'General Snippet';
+            const textValue = document.getElementById('helper-input-text').value.trim();
+
+            if (!textValue) return;
+
+            let items = safeGetStorage('frst_helper_items', []);
+            items.push({ id: Date.now(), section: sectionTitle, content: textValue });
+            safeSetStorage('frst_helper_items', items);
+            
+            document.getElementById('helper-input-section').value = '';
+            document.getElementById('helper-input-text').value = '';
+            loadHelperEntries();
+        }
+
+        function loadHelperEntries() {
+            const displayBox = document.getElementById('helper-saved-list');
+            let items = safeGetStorage('frst_helper_items', []);
+            
+            if(items.length === 0) {
+                displayBox.innerHTML = '<p style="color:#666; font-style:italic;">No saved snippets yet.</p>';
+                return;
+            }
+
+            let html = '';
+            items.forEach(item => {
                 html += `
                     <div class="helper-section">
                         <div class="helper-title">
