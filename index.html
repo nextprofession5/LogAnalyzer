@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FRST Log Analyzer</title>
+    <style>
+        :root {
+            --bg-color: #1e1e1e;
+            --text-color: #d4d4d4;
+            --container-bg: #2d2d2d;
+            --primary-color: #007acc;
+            --border-color: #444;
+            --attention-color: #ff5555;
+            --nofile-color: #888888;
+        }
+
+        body {
+            font-family: 'Courier New', Courier, monospace;
+            margin: 0;
+            padding: 10px;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-size: 14px;
+        }
+
+        /* Input section */
+        textarea#log-input {
+            width: 100%;
+            height: 100px;
+            background: var(--container-bg);
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+            padding: 10px;
+            box-sizing: border-box;
+            border-radius: 4px;
+        }
+
+        button {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 16px;
+            width: 100%;
+            margin-top: 10px;
+            margin-bottom: 10px;
+        }
+
+        button:active {
+            opacity: 0.8;
+        }
+
+        /* Log Display - No wrap, horizontal scroll */
+        #log-display {
+            background: var(--container-bg);
+            border: 1px solid var(--border-color);
+            padding: 10px;
+            white-space: pre; /* Forces no word wrap */
+            overflow-x: auto; /* Enables horizontal scrolling */
+            min-height: 50vh;
+            border-radius: 4px;
+            user-select: text;
+        }
+
+        .hl-attention { color: var(--attention-color); font-weight: bold; }
+        .hl-nofile { color: var(--nofile-color); font-style: italic; }
+
+        /* Floating Tools Button */
+        #tools-btn {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: auto;
+            padding: 15px 25px;
+            border-radius: 50px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            z-index: 100;
+        }
+
+        /* Modals */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8);
+            z-index: 200;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content {
+            background: var(--bg-color);
+            padding: 20px;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 400px;
+            border: 1px solid var(--border-color);
+            position: relative;
+        }
+
+        .close-btn {
+            position: absolute;
+            top: 10px;
+            right: 15px;
+            font-size: 24px;
+            cursor: pointer;
+            color: white;
+            font-family: sans-serif;
+            font-weight: bold;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 12px;
+            background: var(--container-bg);
+            color: white;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            box-sizing: border-box;
+            font-size: 16px;
+            margin-top: 10px;
+        }
+
+        textarea#results-area {
+            width: 100%;
+            height: 200px;
+            background: var(--container-bg);
+            color: white;
+            border: 1px solid var(--border-color);
+            padding: 10px;
+            box-sizing: border-box;
+            white-space: pre;
+            overflow-x: auto;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+
+    <textarea id="log-input" placeholder="Paste FRST log here..."></textarea>
+    <button onclick="renderLog()">Load Log</button>
+
+    <div id="log-display">Log will appear here...</div>
+
+    <button id="tools-btn" onclick="openModal('tools-modal')">🛠️ Tools</button>
+
+    <div id="tools-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn" onclick="closeModal('tools-modal')">&times;</span>
+            <h2>Tools</h2>
+            <p>Enter instruction (e.g., <i>No File</i>, <i>ATTENTION</i>, or <i>Add: Keyword</i>):</p>
+            <input type="text" id="tool-instruction" placeholder="Enter command...">
+            <button onclick="processInstruction()">Process</button>
+        </div>
+    </div>
+
+    <div id="results-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn" onclick="closeModal('results-modal')">&times;</span>
+            <h2>Results</h2>
+            <textarea id="results-area" readonly></textarea>
+            <button id="copy-btn" onclick="copyResults()">Copy All</button>
+        </div>
+    </div>
+
+    <script>
+        let currentLogLines = [];
+
+        // Renders log and applies highlighting
+        function renderLog() {
+            const rawText = document.getElementById('log-input').value;
+            if (!rawText) return;
+            
+            currentLogLines = rawText.split('\n');
+            let displayHTML = '';
+
+            for (let line of currentLogLines) {
+                // Escape HTML tags for safety and rendering
+                let safeLine = line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                
+                if (safeLine.includes('ATTENTION')) {
+                    displayHTML += `<span class="hl-attention">${safeLine}</span>\n`;
+                } else if (safeLine.includes('No File')) {
+                    displayHTML += `<span class="hl-nofile">${safeLine}</span>\n`;
+                } else {
+                    displayHTML += `${safeLine}\n`;
+                }
+            }
+            
+            document.getElementById('log-display').innerHTML = displayHTML;
+            document.getElementById('log-input').style.display = 'none'; // Hide input to save space
+        }
+
+        // Modal Controls
+        function openModal(id) {
+            document.getElementById(id).style.display = 'flex';
+            if(id === 'tools-modal') {
+                document.getElementById('tool-instruction').focus();
+            }
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).style.display = 'none';
+        }
+
+        // Processing Logic
+        function processInstruction() {
+            const instruction = document.getElementById('tool-instruction').value.trim();
+            if (!instruction) return;
+
+            let isAddMode = instruction.toLowerCase().startsWith('add:');
+            let searchTarget = isAddMode ? instruction.substring(4).trim() : instruction;
+            
+            let extractedLines = [];
+
+            for (let line of currentLogLines) {
+                if (line.toLowerCase().includes(searchTarget.toLowerCase())) {
+                    if (isAddMode) {
+                        extractedLines.push(stripFRSTMetadata(line));
+                    } else {
+                        // Exact match requirement for specific keywords can be enforced here,
+                        // but `.includes` is generally safer for FRST logs.
+                        extractedLines.push(line);
+                    }
+                }
+            }
+
+            document.getElementById('results-area').value = extractedLines.join('\n');
+            closeModal('tools-modal');
+            openModal('results-modal');
+            
+            // Reset copy button text
+            document.getElementById('copy-btn').innerText = 'Copy All';
+        }
+
+        // Strips dates, times, and sizes from FRST lines
+        function stripFRSTMetadata(line) {
+            let cleaned = line;
+            
+            // 1. Strip standard beginning date/time/size stamps 
+            // Matches: "2023-10-25 14:32 - 2023-10-25 14:32 - 000000000 ____D "
+            cleaned = cleaned.replace(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2} - \d{4}-\d{2}-\d{2} \d{2}:\d{2} - \d+ ____[A-Z]?\s*/, '');
+            
+            // 2. Strip single date/time/size stamps (sometimes present)
+            // Matches: "2023-10-25 14:32 - 000000000 ____D "
+            cleaned = cleaned.replace(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2} - \d+ ____[A-Z]?\s*/, '');
+
+            // 3. Strip registry end signatures (Size and Date)
+            // Matches: " [12345 2023-10-25]"
+            cleaned = cleaned.replace(/\s*\[\d+\s+\d{4}-\d{2}-\d{2}\]$/, '');
+            
+            // 4. Strip registry end signatures (Just Size)
+            // Matches: " [12345]"
+            cleaned = cleaned.replace(/\s*\[\d+\]$/, '');
+
+            return cleaned;
+        }
+
+        // Copy functionality
+        function copyResults() {
+            const resultsArea = document.getElementById('results-area');
+            resultsArea.select();
+            resultsArea.setSelectionRange(0, 99999); // For mobile devices
+            
+            navigator.clipboard.writeText(resultsArea.value).then(() => {
+                document.getElementById('copy-btn').innerText = 'Copied!';
+            }).catch(err => {
+                alert('Failed to copy. Please manually copy the text.');
+            });
+        }
+    </script>
+</body>
+</html>
