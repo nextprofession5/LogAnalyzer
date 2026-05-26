@@ -130,7 +130,6 @@
             border-radius: 4px;
             font-size: 11px; 
             line-height: 1.4;
-            /* Prevents native mobile text selection from interrupting the 2-second long press */
             user-select: none; 
             -webkit-user-select: none;
         }
@@ -144,37 +143,49 @@
             background-color: rgba(255,255,255,0.05);
         }
 
-        /* * SYNTAX HIGHLIGHTING THEMES 
-         */
+        /* * SMART SYNTAX HIGHLIGHTING THEMES * */
         
-        /* 1. Default (Inherits from base, mostly gray) */
+        /* 1. Default Gray */
         .theme-default { color: #d4d4d4; }
+        .theme-default .syn-date { color: #d4d4d4; }
+        .theme-default .syn-reg { color: #d4d4d4; }
+        .theme-default .syn-guid { color: #d4d4d4; }
+        .theme-default .syn-path { color: #d4d4d4; }
+        .theme-default .syn-bracket { color: #d4d4d4; }
         
-        /* 2. VS Code Pro (Standard dev colors) */
+        /* 2. VS Code Pro */
         .theme-pro { color: #d4d4d4; }
-        .theme-pro .syn-date { color: #569cd6; } /* Blue */
-        .theme-pro .syn-path { color: #ce9178; } /* Orange/Brown */
-        .theme-pro .syn-bracket { color: #808080; } /* Gray */
+        .theme-pro .syn-date { color: #b5cea8; } /* Numbers/Date Green */
+        .theme-pro .syn-reg { color: #c586c0; } /* Keywords Purple */
+        .theme-pro .syn-guid { color: #dcdcaa; } /* Class Yellow */
+        .theme-pro .syn-path { color: #ce9178; } /* Strings Orange */
+        .theme-pro .syn-bracket { color: #808080; } /* Comments Gray */
 
-        /* 3. Dracula Dark (High contrast dark mode) */
+        /* 3. Dracula Dark */
         .theme-dracula { background-color: #282a36 !important; color: #f8f8f2; }
-        .theme-dracula .syn-date { color: #8be9fd; } /* Cyan */
-        .theme-dracula .syn-path { color: #ff79c6; } /* Pink */
-        .theme-dracula .syn-bracket { color: #6272a4; } /* Blue/Gray */
+        .theme-dracula .syn-date { color: #50fa7b; }
+        .theme-dracula .syn-reg { color: #ff79c6; }
+        .theme-dracula .syn-guid { color: #f1fa8c; }
+        .theme-dracula .syn-path { color: #ffb86c; }
+        .theme-dracula .syn-bracket { color: #6272a4; }
 
-        /* 4. Terminal Hacker (Matrix style) */
+        /* 4. Terminal Hacker */
         .theme-hacker { background-color: #000000 !important; color: #00ff00; }
         .theme-hacker .syn-date { color: #008800; }
+        .theme-hacker .syn-reg { color: #00cc00; font-weight: bold; }
+        .theme-hacker .syn-guid { color: #00ff00; }
         .theme-hacker .syn-path { color: #ffffff; text-decoration: underline; }
         .theme-hacker .syn-bracket { color: #555555; }
 
-        /* 5. Soft Pastel (Easy on eyes) */
+        /* 5. Soft Pastel */
         .theme-pastel { background-color: #2b2b2b !important; color: #e6e6e6; }
-        .theme-pastel .syn-date { color: #a29bfe; } /* Soft Purple */
-        .theme-pastel .syn-path { color: #55efc4; } /* Mint Green */
+        .theme-pastel .syn-date { color: #55efc4; } 
+        .theme-pastel .syn-reg { color: #a29bfe; } 
+        .theme-pastel .syn-guid { color: #ffeaa7; } 
+        .theme-pastel .syn-path { color: #fab1a0; } 
         .theme-pastel .syn-bracket { color: #b2bec3; }
 
-        /* Flagging Overrides (These always show above themes) */
+        /* Flagging Overrides */
         .hl-attention { color: var(--attention-color) !important; font-weight: bold; }
         .hl-nofile { color: var(--nofile-color) !important; font-weight: bold; }
         .hl-yellow { color: var(--yellow-flag) !important; font-weight: bold; background-color: rgba(255, 255, 0, 0.08); }
@@ -328,9 +339,9 @@
             </select>
             <select id="theme-selector" onchange="applyTheme()">
                 <option value="theme-default">🎨 Theme: Default Gray</option>
-                <option value="theme-pro">🎨 Theme: VS Code</option>
+                <option value="theme-pro" selected>🎨 Theme: VS Code</option>
                 <option value="theme-dracula">🎨 Theme: Dracula Dark</option>
-                <option value="theme-hacker">🎨 Theme: Terminal Matrix</option>
+                <option value="theme-hacker">🎨 Theme: Terminal Hacker</option>
                 <option value="theme-pastel">🎨 Theme: Soft Pastel</option>
             </select>
         </div>
@@ -339,7 +350,7 @@
         </div>
     </div>
 
-    <div id="log-display" class="theme-default">Log data will render here...</div>
+    <div id="log-display" class="theme-pro">Log data will render here...</div>
 
     <div class="footer-nav">
         <button onclick="openModal('tools-modal')">🛠️ Tools</button>
@@ -385,9 +396,6 @@ SystemRestore: On
 CreateRestorePoint:
 CloseProcesses:
 
-
----
-
 EmptyTemp:
 Hosts:
 End::</textarea>
@@ -429,7 +437,7 @@ End::</textarea>
 
     <script>
         let currentLogLines = [];
-        const initialFixlistTemplate = `Start::\nSystemRestore: On\nCreateRestorePoint:\nCloseProcesses:\n\n\n---\n\nEmptyTemp:\nHosts:\nEnd::`;
+        const initialFixlistTemplate = `Start::\nSystemRestore: On\nCreateRestorePoint:\nCloseProcesses:\n\nEmptyTemp:\nHosts:\nEnd::`;
 
         const frstSections = ["processes", "registry", "scheduled tasks", "internet", "services", "drivers", "netsvcs", "one month (created)", "one month (modified)", "files in root", "sigcheck"];
         const additionSections = ["accounts", "security center", "installed programs", "packages", "custom clsid", "codecs", "shortcuts & wmi", "loaded modules", "alternate data streams", "safe mode", "association", "internet explorer", "hosts content", "network", "other areas", "msconfig", "firewallrules", "restore points", "faulty device manager", "event log errors", "memory info", "drives", "mbr & partition table"];
@@ -506,18 +514,28 @@ End::</textarea>
                     else frstGroup.appendChild(opt);
                 }
 
-                // Initial HTML escape
+                // Initial escape to prevent HTML injection
                 let safeLine = line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
                 
-                // SYNTAX ENGINE: Wrap dates, paths, and brackets for theme styling
-                // 1. Wrap Date/Time format
+                // --- ADVANCED SYNTAX HIGHLIGHTING ---
+                
+                // 1. Dates & Times (e.g., 2023-10-25 14:32)
                 safeLine = safeLine.replace(/\b\d{4}-\d{2}-\d{2} \d{2}:\d{2}\b/g, '<span class="syn-date">$&</span>');
-                 // 2. Wrap Common Paths/Registry (C:\... or HKLM\...)
-                safeLine = safeLine.replace(/\b([A-Z]:\\[^\s\[\]]+|HK[A-Z]+\\[^\s\[\]]+)/gi, '<span class="syn-path">$&</span>');
-                // 3. Wrap trailing brackets
+                
+                // 2. Registry Keys (Starts with HK, captures path safely)
+                safeLine = safeLine.replace(/\b(HKLM|HKCU|HKU|HKCR|HKCC)\\[^\s\[\]]+/gi, '<span class="syn-reg">$&</span>');
+                
+                // 3. GUIDs / Task hashes
+                safeLine = safeLine.replace(/\{[A-F0-9\-]{36}\}/gi, '<span class="syn-guid">$&</span>');
+
+                // 4. File Paths (Matches C:\ drive, captures until bracket [ or HTML entity &lt; or end of line)
+                safeLine = safeLine.replace(/\b([A-Z]:\\[^\[&]+?)(?=\s*\[|\s*&|$)/gi, '<span class="syn-path">$&</span>'); 
+                
+                // 5. Brackets & Info tags
                 safeLine = safeLine.replace(/\[.*?\]/g, '<span class="syn-bracket">$&</span>');
 
-                // Flagging checks
+
+                // Highlight Flagging checks
                 let matchesOrange = orangeDB.some(keyword => matchDatabaseKeyword(line, keyword));
                 let matchesYellow = yellowDB.some(keyword => matchDatabaseKeyword(line, keyword));
 
@@ -550,10 +568,9 @@ End::</textarea>
             if (!targetDiv) return;
             
             pressTargetIdx = parseInt(targetDiv.id.replace('log-L', ''));
-            // Set for roughly 1.5 seconds to feel smooth on mobile devices
             pressTimer = setTimeout(() => {
                 triggerEditModal(pressTargetIdx);
-            }, 1500); 
+            }, 1200); 
         }
 
         function cancelLongPress() {
@@ -561,10 +578,9 @@ End::</textarea>
             pressTargetIdx = -1;
         }
 
-        // Attach pointer events to the main container (Delegation)
         logDisplay.addEventListener('touchstart', startLongPress, {passive: true});
         logDisplay.addEventListener('touchend', cancelLongPress);
-        logDisplay.addEventListener('touchmove', cancelLongPress, {passive: true}); // Cancel if they scroll
+        logDisplay.addEventListener('touchmove', cancelLongPress, {passive: true}); 
         logDisplay.addEventListener('mousedown', startLongPress);
         logDisplay.addEventListener('mouseup', cancelLongPress);
         logDisplay.addEventListener('mouseleave', cancelLongPress);
@@ -573,7 +589,6 @@ End::</textarea>
             cancelLongPress(); 
             if(index < 0 || index >= currentLogLines.length) return;
             
-            // Gets the exact raw text line natively from memory
             let rawText = currentLogLines[index];
             document.getElementById('edit-line-area').value = rawText;
             openModal('edit-line-modal');
@@ -590,12 +605,15 @@ End::</textarea>
         function appendLineToFixlist(textBlock) {
             const fixArea = document.getElementById('fixlist-area');
             let currentText = fixArea.value;
+            let insertText = textBlock.trim() + '\n';
 
-            // Inserts cleanly on the next empty line before the separator '---' or 'End::'
-            if (currentText.includes('---')) {
-                currentText = currentText.replace('---', textBlock.trim() + '\n---');
+            // Smart insert: Looks for EmptyTemp, then Hosts, then End:: and slips it exactly before them.
+            if (currentText.includes('EmptyTemp:')) {
+                currentText = currentText.replace('EmptyTemp:', insertText + 'EmptyTemp:');
+            } else if (currentText.includes('Hosts:')) {
+                currentText = currentText.replace('Hosts:', insertText + 'Hosts:');
             } else if (currentText.includes('End::')) {
-                currentText = currentText.replace('End::', textBlock.trim() + '\nEnd::');
+                currentText = currentText.replace('End::', insertText + 'End::');
             } else {
                 currentText += '\n' + textBlock.trim();
             }
@@ -748,4 +766,3 @@ End::</textarea>
     </script>
 </body>
 </html>
-         
