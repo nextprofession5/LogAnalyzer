@@ -124,7 +124,6 @@
 
         #log-display div { padding: 2px 0; }
 
-        /* Highlight Rules */
         .hl-attention { color: var(--attention-color); font-weight: bold; }
         .hl-nofile { color: var(--nofile-color); font-weight: bold; }
         .hl-yellow { color: var(--yellow-flag); font-weight: bold; background-color: rgba(255, 255, 0, 0.08); }
@@ -237,6 +236,7 @@
         }
         .db-tag-orange { color: var(--orange-flag); border: 1px solid var(--orange-flag); }
         .db-tag-yellow { color: var(--yellow-flag); border: 1px solid var(--yellow-flag); }
+        .db-hint { font-size: 10px; color: #aaa; margin-top: -8px; margin-bottom: 10px; line-height: 1.3; }
     </style>
 </head>
 <body>
@@ -313,8 +313,12 @@ End::</textarea>
             
             <h2>Flagging Databases</h2>
             <div style="border: 1px dashed #666; padding: 10px; margin-bottom: 20px; border-radius:4px;">
-                <label><b>Enter Target Path / Keyword:</b></label>
+                <label><b>Enter Path, Keyword, or Regex:</b></label>
                 <input type="text" id="db-keyword-input" placeholder="e.g., AppData\Local\RenPy">
+                <div class="db-hint">
+                    💡 <b>Regex support enabled!</b> To use regex rules, wrap them in slashes. <br>
+                    Example (4-20 chars at line end): <code style="color:#ff7700;">/\\[a-zA-Z0-9]{4,20}$/</code>
+                </div>
                 
                 <div style="display:flex; gap:10px; margin-top:5px;">
                     <button style="flex:1; background-color: #f39c12; font-size:13px; padding:10px;" onclick="saveDatabaseKeyword('yellow')">Flag Yellow</button>
@@ -342,7 +346,6 @@ End::</textarea>
         let currentLogLines = [];
         const initialFixlistTemplate = `Start::\nSystemRestore: On\nCreateRestorePoint:\nCloseProcesses:\n\n\n---\n\nEmptyTemp:\nHosts:\nEnd::`;
 
-        // Explicit Section Lists mapping for FRST and Addition logs
         const frstSections = ["processes", "registry", "scheduled tasks", "internet", "services", "drivers", "netsvcs", "one month (created)", "one month (modified)", "files in root", "sigcheck"];
         const additionSections = ["accounts", "security center", "installed programs", "packages", "custom clsid", "codecs", "shortcuts & wmi", "loaded modules", "alternate data streams", "safe mode", "association", "internet explorer", "hosts content", "network", "other areas", "msconfig", "firewallrules", "restore points", "faulty device manager", "event log errors", "memory info", "drives", "mbr & partition table"];
 
@@ -371,6 +374,21 @@ End::</textarea>
             reader.readAsText(file);
         }
 
+        // Dual-Engine Matching logic: Parses regex syntax if wrapped in /.../
+        function matchDatabaseKeyword(line, keyword) {
+            if (keyword.startsWith('/') && keyword.endsWith('/') && keyword.length > 2) {
+                try {
+                    let pattern = keyword.slice(1, -1);
+                    let regex = new RegExp(pattern, 'i');
+                    return regex.test(line);
+                } catch (e) {
+                    return false; 
+                }
+            } else {
+                return line.toLowerCase().includes(keyword.toLowerCase());
+            }
+        }
+
         function renderLog() {
             const rawText = document.getElementById('log-input').value;
             if (!rawText) return;
@@ -382,7 +400,6 @@ End::</textarea>
             const jumper = document.getElementById('section-jumper');
             jumper.innerHTML = '<option value="">-- Jump to Section --</option>';
 
-            // Setup separated OptGroups for the dropdown navigation panel
             const frstGroup = document.createElement('optgroup');
             frstGroup.label = "─── FRST.txt Sections ───";
             const additionGroup = document.createElement('optgroup');
@@ -396,7 +413,6 @@ End::</textarea>
                 const lineEl = document.createElement('div');
                 lineEl.id = `log-L${index}`;
                 
-                // Track standard log dividing headers
                 if (line.startsWith('====================') && line.trim().endsWith('====================')) {
                     const cleanTitle = line.replace(/=/g, '').trim();
                     const lowerTitle = cleanTitle.toLowerCase();
@@ -405,7 +421,6 @@ End::</textarea>
                     opt.value = `log-L${index}`;
                     opt.textContent = cleanTitle;
 
-                    // Separate dynamically into matching categories
                     let matchedFrst = frstSections.some(sec => lowerTitle.includes(sec));
                     let matchedAddition = additionSections.some(sec => lowerTitle.includes(sec));
 
@@ -414,15 +429,14 @@ End::</textarea>
                     } else if (matchedAddition) {
                         additionGroup.appendChild(opt);
                     } else {
-                        // Default fallback if a generic partition bar runs
                         frstGroup.appendChild(opt);
                     }
                 }
 
                 let safeLine = line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
                 
-                let matchesOrange = orangeDB.some(keyword => line.toLowerCase().includes(keyword.toLowerCase()));
-                let matchesYellow = yellowDB.some(keyword => line.toLowerCase().includes(keyword.toLowerCase()));
+                let matchesOrange = orangeDB.some(keyword => matchDatabaseKeyword(line, keyword));
+                let matchesYellow = yellowDB.some(keyword => matchDatabaseKeyword(line, keyword));
 
                 if (matchesOrange && line.trim() !== '') {
                     lineEl.className = 'hl-orange';
@@ -438,7 +452,6 @@ End::</textarea>
                 fragment.appendChild(lineEl);
             });
             
-            // Append explicit groupings cleanly to the jumper panel tool
             if (frstGroup.children.length > 0) jumper.appendChild(frstGroup);
             if (additionGroup.children.length > 0) jumper.appendChild(additionGroup);
 
@@ -613,3 +626,4 @@ End::</textarea>
     </script>
 </body>
 </html>
+   
