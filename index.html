@@ -82,8 +82,16 @@
             margin-bottom: 8px;
             border-radius: 4px;
             border: 1px solid var(--border-color);
-            gap: 8px;
+            flex-direction: column;
+            gap: 6px;
         }
+        
+        .utility-row {
+            display: flex;
+            gap: 6px;
+            width: 100%;
+        }
+
         #utility-bar select, #utility-bar input {
             flex: 1;
             background: #111;
@@ -92,6 +100,7 @@
             padding: 6px;
             border-radius: 4px;
             font-size: 11px;
+            min-width: 0;
         }
 
         button {
@@ -108,6 +117,7 @@
         button:active { opacity: 0.8; }
         .btn-block { width: 100%; margin-top: 10px; }
 
+        /* Log Display Base */
         #log-display {
             background: var(--container-bg);
             border: 1px solid var(--border-color);
@@ -120,14 +130,55 @@
             border-radius: 4px;
             font-size: 11px; 
             line-height: 1.4;
+            /* Prevents native mobile text selection from interrupting the 2-second long press */
+            user-select: none; 
+            -webkit-user-select: none;
         }
 
-        #log-display div { padding: 2px 0; }
+        #log-display div { 
+            padding: 2px 0; 
+            cursor: pointer;
+        }
 
-        .hl-attention { color: var(--attention-color); font-weight: bold; }
-        .hl-nofile { color: var(--nofile-color); font-weight: bold; }
-        .hl-yellow { color: var(--yellow-flag); font-weight: bold; background-color: rgba(255, 255, 0, 0.08); }
-        .hl-orange { color: var(--orange-flag); font-weight: bold; background-color: rgba(255, 119, 0, 0.12); }
+        #log-display div:active {
+            background-color: rgba(255,255,255,0.05);
+        }
+
+        /* * SYNTAX HIGHLIGHTING THEMES 
+         */
+        
+        /* 1. Default (Inherits from base, mostly gray) */
+        .theme-default { color: #d4d4d4; }
+        
+        /* 2. VS Code Pro (Standard dev colors) */
+        .theme-pro { color: #d4d4d4; }
+        .theme-pro .syn-date { color: #569cd6; } /* Blue */
+        .theme-pro .syn-path { color: #ce9178; } /* Orange/Brown */
+        .theme-pro .syn-bracket { color: #808080; } /* Gray */
+
+        /* 3. Dracula Dark (High contrast dark mode) */
+        .theme-dracula { background-color: #282a36 !important; color: #f8f8f2; }
+        .theme-dracula .syn-date { color: #8be9fd; } /* Cyan */
+        .theme-dracula .syn-path { color: #ff79c6; } /* Pink */
+        .theme-dracula .syn-bracket { color: #6272a4; } /* Blue/Gray */
+
+        /* 4. Terminal Hacker (Matrix style) */
+        .theme-hacker { background-color: #000000 !important; color: #00ff00; }
+        .theme-hacker .syn-date { color: #008800; }
+        .theme-hacker .syn-path { color: #ffffff; text-decoration: underline; }
+        .theme-hacker .syn-bracket { color: #555555; }
+
+        /* 5. Soft Pastel (Easy on eyes) */
+        .theme-pastel { background-color: #2b2b2b !important; color: #e6e6e6; }
+        .theme-pastel .syn-date { color: #a29bfe; } /* Soft Purple */
+        .theme-pastel .syn-path { color: #55efc4; } /* Mint Green */
+        .theme-pastel .syn-bracket { color: #b2bec3; }
+
+        /* Flagging Overrides (These always show above themes) */
+        .hl-attention { color: var(--attention-color) !important; font-weight: bold; }
+        .hl-nofile { color: var(--nofile-color) !important; font-weight: bold; }
+        .hl-yellow { color: var(--yellow-flag) !important; font-weight: bold; background-color: rgba(255, 255, 0, 0.08); }
+        .hl-orange { color: var(--orange-flag) !important; font-weight: bold; background-color: rgba(255, 119, 0, 0.12); }
 
         .footer-nav {
             position: fixed;
@@ -229,6 +280,7 @@
         .db-tag {
             display: inline-block;
             background: #444;
+            color: var(--yellow-flag);
             padding: 4px 8px;
             border-radius: 4px;
             margin: 4px;
@@ -236,10 +288,26 @@
         }
         .db-tag-orange { color: var(--orange-flag); border: 1px solid var(--orange-flag); }
         .db-tag-yellow { color: var(--yellow-flag); border: 1px solid var(--yellow-flag); }
-        .db-hint { font-size: 10px; color: #aaa; margin-top: -8px; margin-bottom: 10px; line-height: 1.3; }
+        
+        #toast {
+            display: none;
+            position: fixed;
+            top: 20px; left: 50%;
+            transform: translateX(-50%);
+            background: var(--primary-color);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-weight: bold;
+            z-index: 300;
+            font-size: 13px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.5);
+        }
     </style>
 </head>
 <body>
+
+    <div id="toast">Added to Fixlist</div>
 
     <div class="input-group">
         <textarea id="log-input" placeholder="Paste FRST log here..."></textarea>
@@ -254,18 +322,39 @@
     </div>
 
     <div id="utility-bar">
-        <select id="section-jumper" onchange="jumpToSection()">
-            <option value="">-- Jump to Section --</option>
-        </select>
-        <input type="text" id="live-filter" placeholder="🔍 Filter log view..." oninput="filterLogView()">
+        <div class="utility-row">
+            <select id="section-jumper" onchange="jumpToSection()">
+                <option value="">-- Jump to Section --</option>
+            </select>
+            <select id="theme-selector" onchange="applyTheme()">
+                <option value="theme-default">🎨 Theme: Default Gray</option>
+                <option value="theme-pro">🎨 Theme: VS Code</option>
+                <option value="theme-dracula">🎨 Theme: Dracula Dark</option>
+                <option value="theme-hacker">🎨 Theme: Terminal Matrix</option>
+                <option value="theme-pastel">🎨 Theme: Soft Pastel</option>
+            </select>
+        </div>
+        <div class="utility-row">
+            <input type="text" id="live-filter" placeholder="🔍 Filter log view..." oninput="filterLogView()">
+        </div>
     </div>
 
-    <div id="log-display">Log data will render here...</div>
+    <div id="log-display" class="theme-default">Log data will render here...</div>
 
     <div class="footer-nav">
         <button onclick="openModal('tools-modal')">🛠️ Tools</button>
         <button style="background-color: #e67e22;" onclick="openModal('fixlist-modal')">📝 View Fixlist</button>
         <button style="background-color: #2b8a3e;" onclick="openHelperModal()">📋 Helper GUI</button>
+    </div>
+
+    <div id="edit-line-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn" onclick="closeModal('edit-line-modal')">&times;</span>
+            <h2>Add to Fixlist</h2>
+            <p style="font-size:11px; color:#aaa; margin-top:0;">Edit the exact path or command below before saving.</p>
+            <textarea id="edit-line-area" class="output-box" style="height:120px; font-size:13px;"></textarea>
+            <button class="btn-block" style="background-color: #e67e22;" onclick="saveEditedLine()">Save to Fixlist</button>
+        </div>
     </div>
 
     <div id="tools-modal" class="modal">
@@ -315,10 +404,6 @@ End::</textarea>
             <div style="border: 1px dashed #666; padding: 10px; margin-bottom: 20px; border-radius:4px;">
                 <label><b>Enter Path, Keyword, or Regex:</b></label>
                 <input type="text" id="db-keyword-input" placeholder="e.g., AppData\Local\RenPy">
-                <div class="db-hint">
-                    💡 <b>Regex support enabled!</b> To use regex rules, wrap them in slashes. <br>
-                    Example (4-20 chars at line end): <code style="color:#ff7700;">/\\[a-zA-Z0-9]{4,20}$/</code>
-                </div>
                 
                 <div style="display:flex; gap:10px; margin-top:5px;">
                     <button style="flex:1; background-color: #f39c12; font-size:13px; padding:10px;" onclick="saveDatabaseKeyword('yellow')">Flag Yellow</button>
@@ -350,19 +435,16 @@ End::</textarea>
         const additionSections = ["accounts", "security center", "installed programs", "packages", "custom clsid", "codecs", "shortcuts & wmi", "loaded modules", "alternate data streams", "safe mode", "association", "internet explorer", "hosts content", "network", "other areas", "msconfig", "firewallrules", "restore points", "faulty device manager", "event log errors", "memory info", "drives", "mbr & partition table"];
 
         function safeGetStorage(key, defaultVal) {
-            try { return JSON.parse(localStorage.getItem(key)) || defaultVal; } 
-            catch (e) { return defaultVal; }
+            try { return JSON.parse(localStorage.getItem(key)) || defaultVal; } catch (e) { return defaultVal; }
         }
         function safeSetStorage(key, val) {
-            try { localStorage.setItem(key, JSON.stringify(val)); } 
-            catch (e) { console.warn("Storage restricted."); }
+            try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) { console.warn("Storage restricted."); }
         }
 
         function handleFileUpload() {
             const fileInput = document.getElementById('file-picker');
             const fileNameDisplay = document.getElementById('file-name');
             if (fileInput.files.length === 0) return;
-
             const file = fileInput.files[0];
             fileNameDisplay.innerText = file.name;
 
@@ -374,19 +456,18 @@ End::</textarea>
             reader.readAsText(file);
         }
 
-        // Dual-Engine Matching logic: Parses regex syntax if wrapped in /.../
+        function applyTheme() {
+            const selectedTheme = document.getElementById('theme-selector').value;
+            document.getElementById('log-display').className = selectedTheme;
+        }
+
         function matchDatabaseKeyword(line, keyword) {
             if (keyword.startsWith('/') && keyword.endsWith('/') && keyword.length > 2) {
                 try {
-                    let pattern = keyword.slice(1, -1);
-                    let regex = new RegExp(pattern, 'i');
-                    return regex.test(line);
-                } catch (e) {
-                    return false; 
-                }
-            } else {
-                return line.toLowerCase().includes(keyword.toLowerCase());
+                    return new RegExp(keyword.slice(1, -1), 'i').test(line);
+                } catch (e) { return false; }
             }
+            return line.toLowerCase().includes(keyword.toLowerCase());
         }
 
         function renderLog() {
@@ -416,37 +497,34 @@ End::</textarea>
                 if (line.startsWith('====================') && line.trim().endsWith('====================')) {
                     const cleanTitle = line.replace(/=/g, '').trim();
                     const lowerTitle = cleanTitle.toLowerCase();
-
                     const opt = document.createElement('option');
                     opt.value = `log-L${index}`;
                     opt.textContent = cleanTitle;
 
-                    let matchedFrst = frstSections.some(sec => lowerTitle.includes(sec));
-                    let matchedAddition = additionSections.some(sec => lowerTitle.includes(sec));
-
-                    if (matchedFrst) {
-                        frstGroup.appendChild(opt);
-                    } else if (matchedAddition) {
-                        additionGroup.appendChild(opt);
-                    } else {
-                        frstGroup.appendChild(opt);
-                    }
+                    if (frstSections.some(sec => lowerTitle.includes(sec))) frstGroup.appendChild(opt);
+                    else if (additionSections.some(sec => lowerTitle.includes(sec))) additionGroup.appendChild(opt);
+                    else frstGroup.appendChild(opt);
                 }
 
+                // Initial HTML escape
                 let safeLine = line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
                 
+                // SYNTAX ENGINE: Wrap dates, paths, and brackets for theme styling
+                // 1. Wrap Date/Time format
+                safeLine = safeLine.replace(/\b\d{4}-\d{2}-\d{2} \d{2}:\d{2}\b/g, '<span class="syn-date">$&</span>');
+                 // 2. Wrap Common Paths/Registry (C:\... or HKLM\...)
+                safeLine = safeLine.replace(/\b([A-Z]:\\[^\s\[\]]+|HK[A-Z]+\\[^\s\[\]]+)/gi, '<span class="syn-path">$&</span>');
+                // 3. Wrap trailing brackets
+                safeLine = safeLine.replace(/\[.*?\]/g, '<span class="syn-bracket">$&</span>');
+
+                // Flagging checks
                 let matchesOrange = orangeDB.some(keyword => matchDatabaseKeyword(line, keyword));
                 let matchesYellow = yellowDB.some(keyword => matchDatabaseKeyword(line, keyword));
 
-                if (matchesOrange && line.trim() !== '') {
-                    lineEl.className = 'hl-orange';
-                } else if (matchesYellow && line.trim() !== '') {
-                    lineEl.className = 'hl-yellow';
-                } else if (safeLine.includes('ATTENTION')) {
-                    lineEl.className = 'hl-attention';
-                } else if (safeLine.includes('No File')) {
-                    lineEl.className = 'hl-nofile';
-                }
+                if (matchesOrange && line.trim() !== '') lineEl.classList.add('hl-orange');
+                else if (matchesYellow && line.trim() !== '') lineEl.classList.add('hl-yellow');
+                else if (line.includes('ATTENTION')) lineEl.classList.add('hl-attention');
+                else if (line.includes('No File')) lineEl.classList.add('hl-nofile');
 
                 lineEl.innerHTML = safeLine || '&nbsp;';
                 fragment.appendChild(lineEl);
@@ -458,28 +536,89 @@ End::</textarea>
             displayEl.appendChild(fragment);
             document.querySelector('.input-group').style.display = 'none'; 
             document.getElementById('utility-bar').style.display = 'flex';
+            
+            applyTheme();
+        }
+
+        // --- MOBILE 2-SECOND HOLD TO EDIT LOGIC --- //
+        let pressTimer;
+        let pressTargetIdx = -1;
+        const logDisplay = document.getElementById('log-display');
+
+        function startLongPress(e) {
+            let targetDiv = e.target.closest('div[id^="log-L"]');
+            if (!targetDiv) return;
+            
+            pressTargetIdx = parseInt(targetDiv.id.replace('log-L', ''));
+            // Set for roughly 1.5 seconds to feel smooth on mobile devices
+            pressTimer = setTimeout(() => {
+                triggerEditModal(pressTargetIdx);
+            }, 1500); 
+        }
+
+        function cancelLongPress() {
+            clearTimeout(pressTimer);
+            pressTargetIdx = -1;
+        }
+
+        // Attach pointer events to the main container (Delegation)
+        logDisplay.addEventListener('touchstart', startLongPress, {passive: true});
+        logDisplay.addEventListener('touchend', cancelLongPress);
+        logDisplay.addEventListener('touchmove', cancelLongPress, {passive: true}); // Cancel if they scroll
+        logDisplay.addEventListener('mousedown', startLongPress);
+        logDisplay.addEventListener('mouseup', cancelLongPress);
+        logDisplay.addEventListener('mouseleave', cancelLongPress);
+
+        function triggerEditModal(index) {
+            cancelLongPress(); 
+            if(index < 0 || index >= currentLogLines.length) return;
+            
+            // Gets the exact raw text line natively from memory
+            let rawText = currentLogLines[index];
+            document.getElementById('edit-line-area').value = rawText;
+            openModal('edit-line-modal');
+        }
+
+        function saveEditedLine() {
+            const finalLine = document.getElementById('edit-line-area').value;
+            if (finalLine.trim()) {
+                appendLineToFixlist(finalLine);
+            }
+            closeModal('edit-line-modal');
+        }
+
+        function appendLineToFixlist(textBlock) {
+            const fixArea = document.getElementById('fixlist-area');
+            let currentText = fixArea.value;
+
+            // Inserts cleanly on the next empty line before the separator '---' or 'End::'
+            if (currentText.includes('---')) {
+                currentText = currentText.replace('---', textBlock.trim() + '\n---');
+            } else if (currentText.includes('End::')) {
+                currentText = currentText.replace('End::', textBlock.trim() + '\nEnd::');
+            } else {
+                currentText += '\n' + textBlock.trim();
+            }
+            fixArea.value = currentText;
+
+            const toast = document.getElementById('toast');
+            toast.style.display = 'block';
+            setTimeout(() => { toast.style.display = 'none'; }, 1500);
         }
 
         function jumpToSection() {
             const targetId = document.getElementById('section-jumper').value;
             if (!targetId) return;
             const targetEl = document.getElementById(targetId);
-            if (targetEl) {
-                targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }
+            if (targetEl) targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
 
         function filterLogView() {
             const query = document.getElementById('live-filter').value.toLowerCase();
-            const logContainer = document.getElementById('log-display');
-            const lines = logContainer.getElementsByTagName('div');
-
+            const lines = document.getElementById('log-display').getElementsByTagName('div');
             for (let i = 0; i < lines.length; i++) {
-                if (lines[i].textContent.toLowerCase().includes(query)) {
-                    lines[i].style.display = '';
-                } else {
-                    lines[i].style.display = 'none';
-                }
+                if (lines[i].textContent.toLowerCase().includes(query)) lines[i].style.display = '';
+                else lines[i].style.display = 'none';
             }
         }
 
@@ -501,14 +640,10 @@ End::</textarea>
         function processInstruction() {
             const instruction = document.getElementById('tool-instruction').value.trim();
             if (!instruction) return;
-            
             let extractedLines = [];
             for (let line of currentLogLines) {
-                if (line.includes(instruction)) {
-                    extractedLines.push(line);
-                }
+                if (line.includes(instruction)) extractedLines.push(line);
             }
-
             document.getElementById('results-area').value = extractedLines.join('\n');
             closeModal('tools-modal');
             openModal('results-modal');
@@ -544,6 +679,7 @@ End::</textarea>
             }
             inputEl.value = '';
             renderDatabaseKeywords();
+            if(currentLogLines.length > 0) renderLog();
         }
 
         function renderDatabaseKeywords() {
@@ -552,17 +688,13 @@ End::</textarea>
             let orangeDb = safeGetStorage('frst_orange_db', []);
             
             if(yellowDb.length === 0 && orangeDb.length === 0) {
-                holder.innerHTML = '<p style="font-size:11px; color:#666; margin:0;">Databases are currently empty.</p>';
+                holder.innerHTML = '<p style="font-size:11px; color:#666; margin:0;">Databases empty.</p>';
                 return;
             }
             
             let html = '';
-            yellowDb.forEach((keyword, idx) => {
-                html += `<span class="db-tag db-tag-yellow">${escapeHTML(keyword)} <b style="color:red; cursor:pointer; margin-left:6px;" onclick="deleteDatabaseKeyword('yellow', ${idx})">&times;</b></span>`;
-            });
-            orangeDb.forEach((keyword, idx) => {
-                html += `<span class="db-tag db-tag-orange">${escapeHTML(keyword)} <b style="color:red; cursor:pointer; margin-left:6px;" onclick="deleteDatabaseKeyword('orange', ${idx})">&times;</b></span>`;
-            });
+            yellowDb.forEach((k, idx) => { html += `<span class="db-tag db-tag-yellow">${escapeHTML(k)} <b style="color:red; cursor:pointer; margin-left:6px;" onclick="deleteDatabaseKeyword('yellow', ${idx})">&times;</b></span>`; });
+            orangeDb.forEach((k, idx) => { html += `<span class="db-tag db-tag-orange">${escapeHTML(k)} <b style="color:red; cursor:pointer; margin-left:6px;" onclick="deleteDatabaseKeyword('orange', ${idx})">&times;</b></span>`; });
             holder.innerHTML = html;
         }
 
@@ -572,12 +704,12 @@ End::</textarea>
             db.splice(index, 1);
             safeSetStorage(storageKey, db);
             renderDatabaseKeywords();
+            if(currentLogLines.length > 0) renderLog();
         }
 
         function saveHelperEntry() {
             const sectionTitle = document.getElementById('helper-input-section').value.trim() || 'General Snippet';
             const textValue = document.getElementById('helper-input-text').value.trim();
-
             if (!textValue) return;
 
             let items = safeGetStorage('frst_helper_items', []);
@@ -592,23 +724,13 @@ End::</textarea>
         function loadHelperEntries() {
             const displayBox = document.getElementById('helper-saved-list');
             let items = safeGetStorage('frst_helper_items', []);
-            
             if(items.length === 0) {
-                displayBox.innerHTML = '<p style="color:#666; font-style:italic;">No saved snippets yet.</p>';
+                displayBox.innerHTML = '<p style="color:#666; font-style:italic;">No saved snippets.</p>';
                 return;
             }
-
             let html = '';
             items.forEach(item => {
-                html += `
-                    <div class="helper-section">
-                        <div class="helper-title">
-                            <span>📂 ${escapeHTML(item.section)}</span>
-                            <span class="delete-btn" onclick="deleteHelperEntry(${item.id})">❌ Delete</span>
-                        </div>
-                        <div class="helper-body" onclick="document.execCommand('copy')">${escapeHTML(item.content)}</div>
-                    </div>
-                `;
+                html += `<div class="helper-section"><div class="helper-title"><span>📂 ${escapeHTML(item.section)}</span><span class="delete-btn" onclick="deleteHelperEntry(${item.id})">❌ Delete</span></div><div class="helper-body" onclick="document.execCommand('copy')">${escapeHTML(item.content)}</div></div>`;
             });
             displayBox.innerHTML = html;
         }
@@ -626,4 +748,4 @@ End::</textarea>
     </script>
 </body>
 </html>
-   
+         
