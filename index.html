@@ -15,6 +15,7 @@
             --nofile-color: #00ff66;
             --yellow-flag: #ffff00;
             --orange-flag: #ff7700;
+            --copied-bg: rgba(255, 255, 255, 0.15);
         }
 
         body {
@@ -117,7 +118,6 @@
         button:active { opacity: 0.8; }
         .btn-block { width: 100%; margin-top: 10px; }
 
-        /* Log Display Base */
         #log-display {
             background: var(--container-bg);
             border: 1px solid var(--border-color);
@@ -135,61 +135,22 @@
         }
 
         #log-display div { 
-            padding: 2px 0; 
+            padding: 2px 4px; 
             cursor: pointer;
+            border-left: 3px solid transparent;
+            transition: background-color 0.2s, border-color 0.2s;
         }
 
         #log-display div:active {
             background-color: rgba(255,255,255,0.05);
         }
 
-        /* * SMART SYNTAX HIGHLIGHTING THEMES * */
-        
-        /* 1. Default Gray */
-        .theme-default { color: #d4d4d4; }
-        .theme-default .syn-date { color: #d4d4d4; }
-        .theme-default .syn-reg { color: #d4d4d4; }
-        .theme-default .syn-guid { color: #d4d4d4; }
-        .theme-default .syn-path { color: #d4d4d4; }
-        .theme-default .syn-bracket { color: #d4d4d4; }
-        
-        /* 2. VS Code Pro */
-        .theme-pro { color: #d4d4d4; }
-        .theme-pro .syn-date { color: #b5cea8; } /* Numbers/Date Green */
-        .theme-pro .syn-reg { color: #c586c0; } /* Keywords Purple */
-        .theme-pro .syn-guid { color: #dcdcaa; } /* Class Yellow */
-        .theme-pro .syn-path { color: #ce9178; } /* Strings Orange */
-        .theme-pro .syn-bracket { color: #808080; } /* Comments Gray */
-
-        /* 3. Dracula Dark */
-        .theme-dracula { background-color: #282a36 !important; color: #f8f8f2; }
-        .theme-dracula .syn-date { color: #50fa7b; }
-        .theme-dracula .syn-reg { color: #ff79c6; }
-        .theme-dracula .syn-guid { color: #f1fa8c; }
-        .theme-dracula .syn-path { color: #ffb86c; }
-        .theme-dracula .syn-bracket { color: #6272a4; }
-
-        /* 4. Terminal Hacker */
-        .theme-hacker { background-color: #000000 !important; color: #00ff00; }
-        .theme-hacker .syn-date { color: #008800; }
-        .theme-hacker .syn-reg { color: #00cc00; font-weight: bold; }
-        .theme-hacker .syn-guid { color: #00ff00; }
-        .theme-hacker .syn-path { color: #ffffff; text-decoration: underline; }
-        .theme-hacker .syn-bracket { color: #555555; }
-
-        /* 5. Soft Pastel */
-        .theme-pastel { background-color: #2b2b2b !important; color: #e6e6e6; }
-        .theme-pastel .syn-date { color: #55efc4; } 
-        .theme-pastel .syn-reg { color: #a29bfe; } 
-        .theme-pastel .syn-guid { color: #ffeaa7; } 
-        .theme-pastel .syn-path { color: #fab1a0; } 
-        .theme-pastel .syn-bracket { color: #b2bec3; }
-
-        /* Flagging Overrides */
+        /* Flagging & Tracking Styles */
         .hl-attention { color: var(--attention-color) !important; font-weight: bold; }
         .hl-nofile { color: var(--nofile-color) !important; font-weight: bold; }
         .hl-yellow { color: var(--yellow-flag) !important; font-weight: bold; background-color: rgba(255, 255, 0, 0.08); }
         .hl-orange { color: var(--orange-flag) !important; font-weight: bold; background-color: rgba(255, 119, 0, 0.12); }
+        .hl-copied { background-color: var(--copied-bg) !important; border-left: 3px solid var(--primary-color) !important; }
 
         .footer-nav {
             position: fixed;
@@ -318,7 +279,7 @@
 </head>
 <body>
 
-    <div id="toast">Added to Fixlist</div>
+    <div id="toast">Copied to clipboard!</div>
 
     <div class="input-group">
         <textarea id="log-input" placeholder="Paste FRST log here..."></textarea>
@@ -337,35 +298,18 @@
             <select id="section-jumper" onchange="jumpToSection()">
                 <option value="">-- Jump to Section --</option>
             </select>
-            <select id="theme-selector" onchange="applyTheme()">
-                <option value="theme-default">🎨 Theme: Default Gray</option>
-                <option value="theme-pro" selected>🎨 Theme: VS Code</option>
-                <option value="theme-dracula">🎨 Theme: Dracula Dark</option>
-                <option value="theme-hacker">🎨 Theme: Terminal Hacker</option>
-                <option value="theme-pastel">🎨 Theme: Soft Pastel</option>
-            </select>
         </div>
         <div class="utility-row">
             <input type="text" id="live-filter" placeholder="🔍 Filter log view..." oninput="filterLogView()">
         </div>
     </div>
 
-    <div id="log-display" class="theme-pro">Log data will render here...</div>
+    <div id="log-display">Log data will render here...</div>
 
     <div class="footer-nav">
         <button onclick="openModal('tools-modal')">🛠️ Tools</button>
         <button style="background-color: #e67e22;" onclick="openModal('fixlist-modal')">📝 View Fixlist</button>
         <button style="background-color: #2b8a3e;" onclick="openHelperModal()">📋 Helper GUI</button>
-    </div>
-
-    <div id="edit-line-modal" class="modal">
-        <div class="modal-content">
-            <span class="close-btn" onclick="closeModal('edit-line-modal')">&times;</span>
-            <h2>Add to Fixlist</h2>
-            <p style="font-size:11px; color:#aaa; margin-top:0;">Edit the exact path or command below before saving.</p>
-            <textarea id="edit-line-area" class="output-box" style="height:120px; font-size:13px;"></textarea>
-            <button class="btn-block" style="background-color: #e67e22;" onclick="saveEditedLine()">Save to Fixlist</button>
-        </div>
     </div>
 
     <div id="tools-modal" class="modal">
@@ -464,11 +408,6 @@ End::</textarea>
             reader.readAsText(file);
         }
 
-        function applyTheme() {
-            const selectedTheme = document.getElementById('theme-selector').value;
-            document.getElementById('log-display').className = selectedTheme;
-        }
-
         function matchDatabaseKeyword(line, keyword) {
             if (keyword.startsWith('/') && keyword.endsWith('/') && keyword.length > 2) {
                 try {
@@ -514,28 +453,8 @@ End::</textarea>
                     else frstGroup.appendChild(opt);
                 }
 
-                // Initial escape to prevent HTML injection
                 let safeLine = line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
                 
-                // --- ADVANCED SYNTAX HIGHLIGHTING ---
-                
-                // 1. Dates & Times (e.g., 2023-10-25 14:32)
-                safeLine = safeLine.replace(/\b\d{4}-\d{2}-\d{2} \d{2}:\d{2}\b/g, '<span class="syn-date">$&</span>');
-                
-                // 2. Registry Keys (Starts with HK, captures path safely)
-                safeLine = safeLine.replace(/\b(HKLM|HKCU|HKU|HKCR|HKCC)\\[^\s\[\]]+/gi, '<span class="syn-reg">$&</span>');
-                
-                // 3. GUIDs / Task hashes
-                safeLine = safeLine.replace(/\{[A-F0-9\-]{36}\}/gi, '<span class="syn-guid">$&</span>');
-
-                // 4. File Paths (Matches C:\ drive, captures until bracket [ or HTML entity &lt; or end of line)
-                safeLine = safeLine.replace(/\b([A-Z]:\\[^\[&]+?)(?=\s*\[|\s*&|$)/gi, '<span class="syn-path">$&</span>'); 
-                
-                // 5. Brackets & Info tags
-                safeLine = safeLine.replace(/\[.*?\]/g, '<span class="syn-bracket">$&</span>');
-
-
-                // Highlight Flagging checks
                 let matchesOrange = orangeDB.some(keyword => matchDatabaseKeyword(line, keyword));
                 let matchesYellow = yellowDB.some(keyword => matchDatabaseKeyword(line, keyword));
 
@@ -554,11 +473,9 @@ End::</textarea>
             displayEl.appendChild(fragment);
             document.querySelector('.input-group').style.display = 'none'; 
             document.getElementById('utility-bar').style.display = 'flex';
-            
-            applyTheme();
         }
 
-        // --- MOBILE 2-SECOND HOLD TO EDIT LOGIC --- //
+        // --- MOBILE HOLD-TO-COPY LOGIC --- //
         let pressTimer;
         let pressTargetIdx = -1;
         const logDisplay = document.getElementById('log-display');
@@ -568,9 +485,10 @@ End::</textarea>
             if (!targetDiv) return;
             
             pressTargetIdx = parseInt(targetDiv.id.replace('log-L', ''));
+            // Reduced timer to 500ms for quick workflow
             pressTimer = setTimeout(() => {
-                triggerEditModal(pressTargetIdx);
-            }, 1200); 
+                copyLineToClipboard(pressTargetIdx);
+            }, 500); 
         }
 
         function cancelLongPress() {
@@ -585,43 +503,20 @@ End::</textarea>
         logDisplay.addEventListener('mouseup', cancelLongPress);
         logDisplay.addEventListener('mouseleave', cancelLongPress);
 
-        function triggerEditModal(index) {
+        function copyLineToClipboard(index) {
             cancelLongPress(); 
             if(index < 0 || index >= currentLogLines.length) return;
             
             let rawText = currentLogLines[index];
-            document.getElementById('edit-line-area').value = rawText;
-            openModal('edit-line-modal');
-        }
-
-        function saveEditedLine() {
-            const finalLine = document.getElementById('edit-line-area').value;
-            if (finalLine.trim()) {
-                appendLineToFixlist(finalLine);
-            }
-            closeModal('edit-line-modal');
-        }
-
-        function appendLineToFixlist(textBlock) {
-            const fixArea = document.getElementById('fixlist-area');
-            let currentText = fixArea.value;
-            let insertText = textBlock.trim() + '\n';
-
-            // Smart insert: Looks for EmptyTemp, then Hosts, then End:: and slips it exactly before them.
-            if (currentText.includes('EmptyTemp:')) {
-                currentText = currentText.replace('EmptyTemp:', insertText + 'EmptyTemp:');
-            } else if (currentText.includes('Hosts:')) {
-                currentText = currentText.replace('Hosts:', insertText + 'Hosts:');
-            } else if (currentText.includes('End::')) {
-                currentText = currentText.replace('End::', insertText + 'End::');
-            } else {
-                currentText += '\n' + textBlock.trim();
-            }
-            fixArea.value = currentText;
-
-            const toast = document.getElementById('toast');
-            toast.style.display = 'block';
-            setTimeout(() => { toast.style.display = 'none'; }, 1500);
+            navigator.clipboard.writeText(rawText).then(() => {
+                // Highlight the line so user doesn't lose track
+                document.getElementById('log-L' + index).classList.add('hl-copied');
+                
+                // Show notification
+                const toast = document.getElementById('toast');
+                toast.style.display = 'block';
+                setTimeout(() => { toast.style.display = 'none'; }, 1000);
+      });
         }
 
         function jumpToSection() {
