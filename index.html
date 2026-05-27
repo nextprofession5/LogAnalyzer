@@ -285,8 +285,8 @@
         <textarea id="log-input" placeholder="Paste FRST log here..."></textarea>
         <div class="file-input-wrapper">
             <label class="custom-file-upload">
-                <input type="file" id="file-picker" accept=".txt" onchange="handleFileUpload()">
-                📁 Upload .txt Log
+                <input type="file" id="file-picker" accept=".txt" multiple onchange="handleFileUpload()">
+                📁 Upload Logs
             </label>
             <span id="file-name" style="font-size:12px; color:#888;">No file selected</span>
         </div>
@@ -343,8 +343,13 @@ CloseProcesses:
 EmptyTemp:
 Hosts:
 End::</textarea>
-            <button id="copy-fix-btn" class="btn-block" style="background-color:#e67e22;" onclick="copyResults('fixlist-area', 'copy-fix-btn')">Copy All</button>
-            <button class="btn-block" style="background-color:#555; margin-top:5px;" onclick="clearFixlist()">Reset Template</button>
+            
+            <div style="display: flex; gap: 10px; margin-top: 10px;">
+                <button id="copy-fix-btn" style="flex: 1; background-color:#e67e22;" onclick="copyResults('fixlist-area', 'copy-fix-btn')">Copy</button>
+                <button style="flex: 1; background-color:#2980b9;" onclick="downloadFixlist()">💾 Save .txt</button>
+            </div>
+            
+            <button class="btn-block" style="background-color:#555; margin-top:10px;" onclick="clearFixlist()">Reset Template</button>
         </div>
     </div>
 
@@ -393,19 +398,27 @@ End::</textarea>
             try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) { console.warn("Storage restricted."); }
         }
 
-        function handleFileUpload() {
+        // Updated for multiple files
+        async function handleFileUpload() {
             const fileInput = document.getElementById('file-picker');
             const fileNameDisplay = document.getElementById('file-name');
             if (fileInput.files.length === 0) return;
-            const file = fileInput.files[0];
-            fileNameDisplay.innerText = file.name;
+            
+            let fileNames = [];
+            let combinedContent = "";
 
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                document.getElementById('log-input').value = e.target.result;
-                renderLog();
-            };
-            reader.readAsText(file);
+            for (let i = 0; i < fileInput.files.length; i++) {
+                let file = fileInput.files[i];
+                fileNames.push(file.name);
+                let text = await file.text();
+                // Add a visual separator if loading more than one log so the jumper catches it
+                if(i > 0) combinedContent += `\n==================== End of Previous Log ====================\n\n`;
+                combinedContent += text + "\n";
+            }
+
+            fileNameDisplay.innerText = fileNames.join(', ');
+            document.getElementById('log-input').value = combinedContent;
+            renderLog();
         }
 
         function matchDatabaseKeyword(line, keyword) {
@@ -509,14 +522,11 @@ End::</textarea>
             
             let rawText = currentLogLines[index];
             navigator.clipboard.writeText(rawText).then(() => {
-                // Highlight the line so user doesn't lose track
                 document.getElementById('log-L' + index).classList.add('hl-copied');
-                
-                // Show notification
                 const toast = document.getElementById('toast');
                 toast.style.display = 'block';
                 setTimeout(() => { toast.style.display = 'none'; }, 1000);
-      });
+            });
         }
 
         function jumpToSection() {
@@ -539,6 +549,19 @@ End::</textarea>
             if(confirm("Reset fixlist container workspace back to default template layout?")) {
                 document.getElementById('fixlist-area').value = initialFixlistTemplate;
             }
+        }
+
+        function downloadFixlist() {
+            const content = document.getElementById('fixlist-area').value;
+            const blob = new Blob([content], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'fixlist.txt';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
         }
 
         function openModal(id) {
