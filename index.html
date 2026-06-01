@@ -252,7 +252,6 @@
         .db-tag {
             display: inline-block;
             background: #444;
-            color: var(--yellow-flag);
             padding: 4px 8px;
             border-radius: 4px;
             margin: 4px;
@@ -357,6 +356,13 @@ End::</textarea>
         <div class="modal-content">
             <span class="close-btn" onclick="closeModal('helper-modal')">&times;</span>
             
+            <h2>File Verification Lookup</h2>
+            <div style="border: 1px dashed var(--primary-color); padding: 10px; margin-bottom: 20px; border-radius:4px;">
+                <label><b>Query File Name or Process:</b></label>
+                <input type="text" id="lookup-filename-input" placeholder="e.g., svchost.exe or badfile.sys">
+                <button class="btn-block" style="background-color: var(--primary-color);" onclick="runExternalFileLookup()">Search File.net Reputation</button>
+            </div>
+
             <h2>Flagging Databases</h2>
             <div style="border: 1px dashed #666; padding: 10px; margin-bottom: 20px; border-radius:4px;">
                 <label><b>Enter Path, Keyword, or Regex:</b></label>
@@ -398,7 +404,6 @@ End::</textarea>
             try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) { console.warn("Storage restricted."); }
         }
 
-        // Updated for multiple files
         async function handleFileUpload() {
             const fileInput = document.getElementById('file-picker');
             const fileNameDisplay = document.getElementById('file-name');
@@ -411,7 +416,6 @@ End::</textarea>
                 let file = fileInput.files[i];
                 fileNames.push(file.name);
                 let text = await file.text();
-                // Add a visual separator if loading more than one log so the jumper catches it
                 if(i > 0) combinedContent += `\n==================== End of Previous Log ====================\n\n`;
                 combinedContent += text + "\n";
             }
@@ -498,7 +502,6 @@ End::</textarea>
             if (!targetDiv) return;
             
             pressTargetIdx = parseInt(targetDiv.id.replace('log-L', ''));
-            // Reduced timer to 500ms for quick workflow
             pressTimer = setTimeout(() => {
                 copyLineToClipboard(pressTargetIdx);
             }, 500); 
@@ -527,6 +530,17 @@ End::</textarea>
                 toast.style.display = 'block';
                 setTimeout(() => { toast.style.display = 'none'; }, 1000);
             });
+        }
+
+        // Runs secure cross-origin file verification lookup routing
+        function runExternalFileLookup() {
+            const inputEl = document.getElementById('lookup-filename-input');
+            const targetFile = inputEl.value.trim();
+            if(!targetFile) return;
+
+            // Directs sandbox safely to Google domain scanning specialized site parameters
+            const queryUrl = 'https://www.google.com/search?q=site:file.net+' + encodeURIComponent(targetFile);
+            window.open(queryUrl, '_blank');
         }
 
         function jumpToSection() {
