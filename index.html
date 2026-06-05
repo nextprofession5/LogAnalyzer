@@ -330,7 +330,7 @@
             <button id="copy-standard-btn" class="btn-block" onclick="copyResults('parse-standard-area', 'copy-standard-btn')" style="margin-top: 5px;">Copy System Flags</button>
 
             <h3 style="color: var(--orange-flag); margin-bottom: 5px; margin-top: 20px; font-size: 14px;">🤖 Smart Suspects</h3>
-            <p style="font-size: 10px; margin-top: 0; color: #888;">Heuristic matches: Temp drops, obfuscation, double-extensions, random names.</p>
+            <p style="font-size: 10px; margin-top: 0; color: #888;">Multi-layered heuristic matches. Suppresses legitimate apps and harmless firewall rules.</p>
             <textarea id="parse-sus-area" class="output-box" style="height: 120px;"></textarea>
             <button id="copy-sus-btn" class="btn-block" onclick="copyResults('parse-sus-area', 'copy-sus-btn')" style="margin-top: 5px; background-color: var(--orange-flag);">Copy Suspects</button>
         </div>
@@ -510,7 +510,7 @@ End::</textarea>
             document.getElementById('utility-bar').style.display = 'flex';
         }
 
-        // --- NEW: AUTO-PARSE ENGINE --- //
+        // --- MASTER AUTO-PARSE EXECUTION PANEL --- //
         function runAutoParse() {
             if (currentLogLines.length === 0) {
                 alert("Please load a log file first.");
@@ -523,13 +523,13 @@ End::</textarea>
             currentLogLines.forEach(line => {
                 if (line.trim() === '') return;
 
-                // 1. Standard Extraction
+                // 1. System Flag Extraction
                 if (line.includes('ATTENTION') || line.includes('No File')) {
                     standardFlags.push(line);
                 }
 
-                // 2. Heuristic Engine Execution
-                if (isSuspicious(line)) {
+                // 2. High-Yield Heuristic Scoring Engine
+                if (evaluateHeuristicScore(line) >= 3) {
                     suspiciousFlags.push(line);
                 }
             });
@@ -537,34 +537,79 @@ End::</textarea>
             document.getElementById('parse-standard-area').value = standardFlags.join('\n');
             document.getElementById('parse-sus-area').value = suspiciousFlags.join('\n');
             
-            // Reset button texts
             document.getElementById('copy-standard-btn').innerText = 'Copy System Flags';
             document.getElementById('copy-sus-btn').innerText = 'Copy Suspects';
             
             openModal('auto-parse-modal');
         }
 
-        // Heuristic Logic Ruleset
-        function isSuspicious(line) {
+        // ADVANCED LAYERED HEURISTIC SCORE ENGINE
+        function evaluateHeuristicScore(line) {
             const lowerLine = line.toLowerCase();
+            let score = 0;
+
+            // --- LAYER 0: THE MASTER LEGITIMATE WHITELIST (Instant Silencer) ---
+            const hardWhitelist = [
+                'nvidia corporation', 'microsoft corporation', 'microsoft windows', 'mozilla foundation',
+                'valve corporation', 'epic games', 'adobe systems', 'google llc', 'voidtools', 'spotify ab',
+                'qbittorrent', 'blizzard entertainment', 'signalrgb', 'vulkaninfo', 'wondershare', 'movavi'
+            ];
+            if (hardWhitelist.some(publisher => lowerLine.includes(publisher))) {
+                return 0; // Absolute safety guarantee, suppress parsing
+            }
+
+            // Suppress benign orphaned firewall rules for common apps/games to reduce junk
+            if (lowerLine.startsWith('firewallrules:') && 
+               (lowerLine.includes('steamwebhelper') || lowerLine.includes('witcher') || lowerLine.includes('deadrising') || lowerLine.includes('clipstudio') || lowerLine.includes('vpnclient') || lowerLine.includes('powerpnt') || lowerLine.includes('protocolhandler') || lowerLine.includes('houseparty') || lowerLine.includes('subnautica') || lowerLine.includes('epicwebhelper') || lowerLine.includes('cyberpunk') || lowerLine.includes('7daystodie') || lowerLine.includes('we happy few') || lowerLine.includes('overwatch'))) {
+                return 0;
+            }
+
+            // --- LAYER 1: MULTI-LAYERED RISK VECTORS ---
             
-            // 1. Double Extensions (e.g., file.pdf.exe)
-            if (lowerLine.match(/\.[a-z0-9]{2,4}\.(vbs|exe|cmd|bat|ps1|js)\b/)) return true;
+            // Vector A: Risky directories execution locations (+1 point)
+            if (lowerLine.includes('\\appdata\\local\\temp\\') || 
+                lowerLine.includes('c:\\programdata\\') ||
+                lowerLine.match(/c:\\users\\[^\\]+\\appdata\\(local|roaming)/)) {
+                score += 1;
+            }
 
-            // 2. Executing directly from Temp or root User AppData
-            if (lowerLine.includes('\\appdata\\local\\temp\\') && lowerLine.match(/\.(exe|dll|vbs|bat|ps1|js)$/)) return true;
-            if (lowerLine.match(/c:\\users\\[^\\]+\\appdata\\(local|roaming)\\[^\\]+\.(exe|dll|js|vbs)/)) return true;
+            // Vector B: Unsigned code execution (+2 points)
+            if (lowerLine.includes('[file not signed]')) {
+                score += 2;
+            }
 
-            // 3. Obfuscated or hidden shell execution
-            if (lowerLine.match(/\b(powershell|pwsh|cmd\.exe).+-(enc|w hidden|ep bypass|nop)\b/)) return true;
+            // Vector C: Active persistence item is missing file payload (+1 point)
+            // (Only contextually applied outside of firewall rules to dodge dead rules noise)
+            if (lowerLine.includes('no file') && !lowerLine.startsWith('firewallrules:')) {
+                score += 1;
+            }
 
-            // 4. Executing from ProgramData (High risk drop zone)
-            if (lowerLine.includes('c:\\programdata\\') && lowerLine.match(/\.(exe|dll|vbs|bat|ps1|js)$/)) return true;
+            // Vector D: Attack strings / Malicious signatures (+3 points)
+            if (lowerLine.includes('crack') || lowerLine.includes('loader') || lowerLine.includes('fakeclient') || lowerLine.includes('bypass')) {
+                score += 3;
+            }
 
-            // 5. Random 8 to 15 character executables
-            if (lowerLine.match(/\\(?:[a-z0-9]{8,15})\.exe\b/)) return true;
+            // Vector E: Destructive script / Troll tasks execution commands (+3 points)
+            if (lowerLine.includes('system32\\tasks\\shut down') || (lowerLine.includes('shutdown.exe') && lowerLine.includes('/f'))) {
+                score += 3;
+            }
 
-            return false;
+            // Vector F: Hidden script masking / Obfuscation techniques (+3 points)
+            if (lowerLine.match(/\b(powershell|pwsh|cmd\.exe).+-(enc|w hidden|ep bypass|nop)\b/)) {
+                score += 3;
+            }
+
+            // Vector G: Masked double extensions (+4 points)
+            if (lowerLine.match(/\.[a-z0-9]{2,4}\.(vbs|exe|cmd|bat|ps1|js)\b/)) {
+                score += 4;
+            }
+
+            // Vector H: Pure Alphanumeric Entropy / High Randomness filenames (+3 points)
+            if (lowerLine.match(/\\(?:[a-z0-9]{8,16})\.exe\b/)) {
+                score += 3;
+            }
+
+            return score;
         }
 
         // --- MOBILE HOLD-TO-COPY LOGIC --- //
