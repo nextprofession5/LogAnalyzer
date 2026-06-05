@@ -212,7 +212,6 @@
 
         textarea.output-box {
             width: 100%;
-            height: 240px;
             background: var(--container-bg);
             color: white;
             border: 1px solid var(--border-color);
@@ -274,6 +273,14 @@
             font-size: 13px;
             box-shadow: 0 4px 6px rgba(0,0,0,0.5);
         }
+
+        .parse-btn {
+            background-color: #9b59b6;
+            width: auto;
+            padding: 6px 14px;
+            margin-top: 0;
+            font-size: 12px;
+        }
     </style>
 </head>
 <body>
@@ -300,6 +307,7 @@
         </div>
         <div class="utility-row">
             <input type="text" id="live-filter" placeholder="🔍 Filter log view..." oninput="filterLogView()">
+            <button class="parse-btn" onclick="runAutoParse()">⚡ Parse</button>
         </div>
     </div>
 
@@ -309,6 +317,23 @@
         <button onclick="openModal('tools-modal')">🛠️ Tools</button>
         <button style="background-color: #e67e22;" onclick="openModal('fixlist-modal')">📝 View Fixlist</button>
         <button style="background-color: #2b8a3e;" onclick="openHelperModal()">📋 Helper GUI</button>
+    </div>
+
+    <div id="auto-parse-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn" onclick="closeModal('auto-parse-modal')">&times;</span>
+            <h2>⚡ Auto-Parse Results</h2>
+            
+            <h3 style="color: var(--attention-color); margin-bottom: 5px; font-size: 14px;">⚠️ System Flags</h3>
+            <p style="font-size: 10px; margin-top: 0; color: #888;">Matches 'ATTENTION' or 'No File'</p>
+            <textarea id="parse-standard-area" class="output-box" style="height: 120px;"></textarea>
+            <button id="copy-standard-btn" class="btn-block" onclick="copyResults('parse-standard-area', 'copy-standard-btn')" style="margin-top: 5px;">Copy System Flags</button>
+
+            <h3 style="color: var(--orange-flag); margin-bottom: 5px; margin-top: 20px; font-size: 14px;">🤖 Smart Suspects</h3>
+            <p style="font-size: 10px; margin-top: 0; color: #888;">Heuristic matches: Temp drops, obfuscation, double-extensions, random names.</p>
+            <textarea id="parse-sus-area" class="output-box" style="height: 120px;"></textarea>
+            <button id="copy-sus-btn" class="btn-block" onclick="copyResults('parse-sus-area', 'copy-sus-btn')" style="margin-top: 5px; background-color: var(--orange-flag);">Copy Suspects</button>
+        </div>
     </div>
 
     <div id="tools-modal" class="modal">
@@ -325,7 +350,7 @@
         <div class="modal-content">
             <span class="close-btn" onclick="closeModal('results-modal')">&times;</span>
             <h2>Extracted Results</h2>
-            <textarea id="results-area" class="output-box" readonly></textarea>
+            <textarea id="results-area" class="output-box" style="height: 240px;" readonly></textarea>
             <button id="copy-btn" class="btn-block" onclick="copyResults('results-area', 'copy-btn')">Copy All</button>
         </div>
     </div>
@@ -334,7 +359,7 @@
         <div class="modal-content">
             <span class="close-btn" onclick="closeModal('fixlist-modal')">&times;</span>
             <h2>Fixlist</h2>
-            <textarea id="fixlist-area" class="output-box">Start::
+            <textarea id="fixlist-area" class="output-box" style="height: 240px;">Start::
 SystemRestore: On
 CreateRestorePoint:
 CloseProcesses:
@@ -356,13 +381,6 @@ End::</textarea>
         <div class="modal-content">
             <span class="close-btn" onclick="closeModal('helper-modal')">&times;</span>
             
-            <h2>File Verification Lookup</h2>
-            <div style="border: 1px dashed var(--primary-color); padding: 10px; margin-bottom: 20px; border-radius:4px;">
-                <label><b>Query File Name or Process:</b></label>
-                <input type="text" id="lookup-filename-input" placeholder="e.g., svchost.exe or badfile.sys">
-                <button class="btn-block" style="background-color: var(--primary-color);" onclick="runExternalFileLookup()">Search File.net Reputation</button>
-            </div>
-
             <h2>Flagging Databases</h2>
             <div style="border: 1px dashed #666; padding: 10px; margin-bottom: 20px; border-radius:4px;">
                 <label><b>Enter Path, Keyword, or Regex:</b></label>
@@ -492,6 +510,63 @@ End::</textarea>
             document.getElementById('utility-bar').style.display = 'flex';
         }
 
+        // --- NEW: AUTO-PARSE ENGINE --- //
+        function runAutoParse() {
+            if (currentLogLines.length === 0) {
+                alert("Please load a log file first.");
+                return;
+            }
+
+            let standardFlags = [];
+            let suspiciousFlags = [];
+
+            currentLogLines.forEach(line => {
+                if (line.trim() === '') return;
+
+                // 1. Standard Extraction
+                if (line.includes('ATTENTION') || line.includes('No File')) {
+                    standardFlags.push(line);
+                }
+
+                // 2. Heuristic Engine Execution
+                if (isSuspicious(line)) {
+                    suspiciousFlags.push(line);
+                }
+            });
+
+            document.getElementById('parse-standard-area').value = standardFlags.join('\n');
+            document.getElementById('parse-sus-area').value = suspiciousFlags.join('\n');
+            
+            // Reset button texts
+            document.getElementById('copy-standard-btn').innerText = 'Copy System Flags';
+            document.getElementById('copy-sus-btn').innerText = 'Copy Suspects';
+            
+            openModal('auto-parse-modal');
+        }
+
+        // Heuristic Logic Ruleset
+        function isSuspicious(line) {
+            const lowerLine = line.toLowerCase();
+            
+            // 1. Double Extensions (e.g., file.pdf.exe)
+            if (lowerLine.match(/\.[a-z0-9]{2,4}\.(vbs|exe|cmd|bat|ps1|js)\b/)) return true;
+
+            // 2. Executing directly from Temp or root User AppData
+            if (lowerLine.includes('\\appdata\\local\\temp\\') && lowerLine.match(/\.(exe|dll|vbs|bat|ps1|js)$/)) return true;
+            if (lowerLine.match(/c:\\users\\[^\\]+\\appdata\\(local|roaming)\\[^\\]+\.(exe|dll|js|vbs)/)) return true;
+
+            // 3. Obfuscated or hidden shell execution
+            if (lowerLine.match(/\b(powershell|pwsh|cmd\.exe).+-(enc|w hidden|ep bypass|nop)\b/)) return true;
+
+            // 4. Executing from ProgramData (High risk drop zone)
+            if (lowerLine.includes('c:\\programdata\\') && lowerLine.match(/\.(exe|dll|vbs|bat|ps1|js)$/)) return true;
+
+            // 5. Random 8 to 15 character executables
+            if (lowerLine.match(/\\(?:[a-z0-9]{8,15})\.exe\b/)) return true;
+
+            return false;
+        }
+
         // --- MOBILE HOLD-TO-COPY LOGIC --- //
         let pressTimer;
         let pressTargetIdx = -1;
@@ -530,17 +605,6 @@ End::</textarea>
                 toast.style.display = 'block';
                 setTimeout(() => { toast.style.display = 'none'; }, 1000);
             });
-        }
-
-        // Runs secure cross-origin file verification lookup routing
-        function runExternalFileLookup() {
-            const inputEl = document.getElementById('lookup-filename-input');
-            const targetFile = inputEl.value.trim();
-            if(!targetFile) return;
-
-            // Directs sandbox safely to Google domain scanning specialized site parameters
-            const queryUrl = 'https://www.google.com/search?q=site:file.net+' + encodeURIComponent(targetFile);
-            window.open(queryUrl, '_blank');
         }
 
         function jumpToSection() {
