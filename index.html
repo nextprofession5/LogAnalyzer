@@ -3,315 +3,97 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FRST Log Analyzer Pro v3.0 (Cognitive Engine)</title>
+    <title>FRST Log Reset Parser</title>
     <style>
-        :root {
-            --bg-color: #1e1e1e; --text-color: #d4d4d4; --container-bg: #2d2d2d;
-            --primary-color: #007acc; --parse-color: #8e44ad; --border-color: #444;
-            --attention-color: #ff5555; --nofile-color: #00ff66;
-            --yellow-flag: #ffff00; --orange-flag: #ff7700;
-            --copied-bg: rgba(255, 255, 255, 0.15);
-        }
-
-        body { font-family: 'Courier New', Courier, monospace; margin: 0; padding: 4px; background-color: var(--bg-color); color: var(--text-color); font-size: 11px; padding-bottom: 80px; }
-        .input-group { background: var(--container-bg); padding: 8px; border-radius: 4px; border: 1px solid var(--border-color); margin-bottom: 10px; }
-        textarea#log-input { width: 100%; height: 80px; background: #111; color: var(--text-color); border: 1px solid var(--border-color); padding: 8px; box-sizing: border-box; border-radius: 4px; resize: vertical; }
-        .file-input-wrapper { margin-top: 8px; display: flex; gap: 10px; align-items: center; }
-        input[type="file"] { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); border: 0; }
-        .custom-file-upload { background: #444; padding: 10px; border-radius: 4px; cursor: pointer; font-weight: bold; display: inline-block; border: 1px solid var(--border-color); }
-        #utility-bar { display: none; background: var(--container-bg); padding: 6px; margin-bottom: 8px; border-radius: 4px; border: 1px solid var(--border-color); flex-direction: column; gap: 6px; }
-        .utility-row { display: flex; gap: 6px; width: 100%; }
-        #utility-bar select, #utility-bar input { flex: 1; background: #111; color: white; border: 1px solid var(--border-color); padding: 6px; border-radius: 4px; font-size: 11px; min-width: 0; }
-        button { background-color: var(--primary-color); color: white; border: none; padding: 12px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 16px; }
-        button:active { opacity: 0.8; }
-        .btn-block { width: 100%; margin-top: 10px; }
-        #log-display { background: var(--container-bg); border: 1px solid var(--border-color); padding: 6px; white-space: pre; overflow-x: auto; min-height: 60vh; width: 100%; box-sizing: border-box; border-radius: 4px; font-size: 11px; line-height: 1.4; user-select: text; }
-        #log-display div { padding: 2px 4px; cursor: pointer; border-left: 3px solid transparent; transition: background-color 0.2s, border-color 0.2s; }
-        #log-display div:active { background-color: rgba(255,255,255,0.05); }
-        .hl-attention { color: var(--attention-color) !important; font-weight: bold; }
-        .hl-nofile { color: var(--nofile-color) !important; font-weight: bold; }
-        .hl-copied { background-color: var(--copied-bg) !important; border-left: 3px solid var(--primary-color) !important; }
-        .footer-nav { position: fixed; bottom: 0; left: 0; right: 0; background: #111; padding: 10px; display: flex; gap: 6px; box-shadow: 0 -4px 10px rgba(0,0,0,0.5); z-index: 100; }
-        .footer-nav button { flex: 1; margin: 0; font-size: 13px; padding: 10px 4px; }
-        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 200; justify-content: center; align-items: center; }
-        .modal-content { background: var(--bg-color); padding: 20px; border-radius: 8px; width: 95%; max-width: 850px; max-height: 85vh; overflow-y: auto; border: 1px solid var(--border-color); position: relative; box-sizing: border-box; }
-        .close-btn { position: absolute; top: 10px; right: 15px; font-size: 28px; cursor: pointer; color: #aaa; font-family: sans-serif; }
-        input[type="text"], textarea.form-control { width: 100%; padding: 12px; background: var(--container-bg); color: white; border: 1px solid var(--border-color); border-radius: 4px; box-sizing: border-box; font-size: 16px; margin-top: 8px; margin-bottom: 12px; }
-        textarea.output-box { width: 100%; background: var(--container-bg); color: white; border: 1px solid var(--border-color); padding: 8px; box-sizing: border-box; white-space: pre; overflow-x: auto; font-size: 11px; font-family: monospace; }
-        #toast { display: none; position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: var(--primary-color); color: white; padding: 10px 20px; border-radius: 20px; font-weight: bold; z-index: 300; font-size: 13px; box-shadow: 0 4px 6px rgba(0,0,0,0.5); }
-        .parse-btn { background-color: var(--parse-color); width: auto; padding: 6px 14px; margin-top: 0; font-size: 12px; }
-        table.threat-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 11px; }
-        table.threat-table th, table.threat-table td { border: 1px solid var(--border-color); padding: 6px; text-align: left; vertical-align: top; }
-        table.threat-table th { background: #222; }
-        .risk-high { color: #ff4757; font-weight: bold; }
-        .risk-med { color: #ffa502; font-weight: bold; }
-        .risk-low { color: #eccc68; }
-        .reason-badge { font-size: 9px; background: #111; padding: 2px 4px; border-radius: 3px; margin-top: 3px; display: block; color: #aaa; border-left: 2px solid var(--parse-color); }
-        .math-badge { font-size: 9px; background: rgba(142, 68, 173, 0.2); padding: 2px 4px; border-radius: 3px; margin-top: 3px; display: inline-block; color: #d7bde2; border: 1px solid #8e44ad;}
+        body { font-family: monospace; background: #111; color: #fff; padding: 15px; }
+        textarea { width: 100%; background: #000; color: #2ed573; border: 1px solid #333; padding: 10px; box-sizing: border-box; }
+        button { background: #007acc; color: white; border: none; padding: 10px 20px; font-weight: bold; cursor: pointer; margin-top: 10px; margin-bottom: 20px; }
+        .output-box { background: #1a1a1a; border: 1px solid #444; padding: 10px; white-space: pre; overflow-x: auto; min-height: 200px; color: #ffb142; }
     </style>
 </head>
 <body>
 
-    <div id="toast">Copied to clipboard!</div>
+    <h3>1. Paste Raw FRST Log Data</h3>
+    <textarea id="log-input" rows="8" placeholder="Paste FRST or Addition logs here..."></textarea>
+    
+    <br>
+    <button onclick="executeTargetedParse()">⚡ Parse Log Entries</button>
 
-    <div class="input-group">
-        <textarea id="log-input" placeholder="Paste FRST log here..."></textarea>
-        <div class="file-input-wrapper">
-            <label class="custom-file-upload">
-                <input type="file" id="file-picker" accept=".txt" multiple onchange="handleFileUpload()">
-                📁 Upload Logs
-            </label>
-            <span id="file-name" style="font-size:12px; color:#888;">No file selected</span>
-        </div>
-        <button class="btn-block" onclick="renderLog()">Process & Load Log</button>
-    </div>
+    <h3>2. Found Indicators List</h3>
+    <div id="hits-output" class="output-box">No logs parsed yet.</div>
 
-    <div id="utility-bar">
-        <div class="utility-row">
-            <select id="section-jumper" onchange="jumpToSection()">
-                <option value="">-- Jump to Section --</option>
-            </select>
-        </div>
-        <div class="utility-row">
-            <input type="text" id="live-filter" placeholder="🔍 Filter log view..." oninput="filterLogView()">
-            <button class="parse-btn" id="master-parse-trigger" onclick="runCognitiveParse()">🧠 Run Cognitive Math Engine</button>
-        </div>
-    </div>
-
-    <div id="log-display">Log data will render here...</div>
-
-    <div class="footer-nav">
-        <button onclick="openModal('tools-modal')">🛠️ Tools</button>
-        <button style="background-color: #e67e22;" onclick="openModal('fixlist-modal')">📝 View Fixlist</button>
-        <button style="background-color: #2b8a3e;" onclick="openModal('helper-modal')">📋 Helper GUI</button>
-    </div>
-
-    <div id="auto-parse-modal" class="modal">
-        <div class="modal-content">
-            <span class="close-btn" onclick="closeModal('auto-parse-modal')">&times;</span>
-            <h2>🧠 Cognitive Evaluation Matrix (v3.0)</h2>
-            
-            <div id="summary-stats" style="margin-bottom: 12px; font-size: 13px; font-weight: bold;"></div>
-            
-            <div style="overflow-y: auto; max-height: 250px; border: 1px solid var(--border-color); margin-bottom: 15px;">
-                <table class="threat-table">
-                    <thead>
-                        <tr><th style="width:40px;">Score</th><th style="width:50px;">Risk</th><th style="width:250px;">Algorithmic Logic Vectors</th><th>Raw Telemetry</th></tr>
-                    </thead>
-                    <tbody id="threat-tbody"></tbody>
-                </table>
-            </div>
-
-            <h3 style="color: var(--orange-flag); margin-bottom: 5px; font-size: 13px;">📋 Auto-Compiled Script Workspace</h3>
-            <textarea id="auto-fixlist-area" class="output-box" style="height: 140px;" readonly></textarea>
-            <button id="copy-auto-fix-btn" class="btn-block" onclick="copyResults('auto-fixlist-area', 'copy-auto-fix-btn')" style="background-color: #e67e22;">Copy Script Commands</button>
-        </div>
-    </div>
-
-    <div id="tools-modal" class="modal"><div class="modal-content"><span class="close-btn" onclick="closeModal('tools-modal')">&times;</span><h2>Tools Extraction</h2><input type="text" id="tool-instruction" placeholder="Keyword..."><button class="btn-block" onclick="processInstruction()">Extract</button></div></div>
-    <div id="results-modal" class="modal"><div class="modal-content"><span class="close-btn" onclick="closeModal('results-modal')">&times;</span><h2>Results</h2><textarea id="results-area" class="output-box" style="height: 240px;" readonly></textarea><button id="copy-btn" class="btn-block" onclick="copyResults('results-area', 'copy-btn')">Copy</button></div></div>
-    <div id="fixlist-modal" class="modal"><div class="modal-content"><span class="close-btn" onclick="closeModal('fixlist-modal')">&times;</span><h2>Fixlist Workspace</h2><textarea id="fixlist-area" class="output-box" style="height: 240px;">Start::\nSystemRestore: On\nCreateRestorePoint:\nCloseProcesses:\n\nEmptyTemp:\nHosts:\nEnd::</textarea><div style="display: flex; gap: 10px; margin-top: 10px;"><button style="flex: 1; background-color:#e67e22;" onclick="copyResults('fixlist-area', 'copy-fix-btn')">Copy</button></div></div></div>
-    <div id="helper-modal" class="modal"><div class="modal-content"><span class="close-btn" onclick="closeModal('helper-modal')">&times;</span><h2>Process Query</h2><input type="text" id="lookup-filename-input"><button class="btn-block" onclick="runManualSearchQuery()">Search Web</button></div></div>
+    <h3>3. Auto-Generated Fixlist Syntax</h3>
+    <textarea id="fixlist-output" rows="10" placeholder="Fixlist commands will output here..."></textarea>
 
     <script>
-        let currentLogLines = [];
-        const frstSections = ["processes", "registry", "scheduled tasks", "internet", "services", "drivers", "netsvcs", "one month (created)", "one month (modified)", "files in root", "sigcheck"];
-        
-        // GLOBAL COGNITIVE MEMORY (Cross-Section Correlation)
-        let globalThreatMemory = new Set(); 
-
-        // CRITICAL SYSTEM FILES (For Typosquatting checks)
-        const coreSystemBinaries = ["svchost.exe", "explorer.exe", "winlogon.exe", "lsass.exe", "csrss.exe", "taskmgr.exe", "services.exe", "smss.exe"];
-
-        // 🧠 ALGORITHM 1: Shannon Entropy (Calculates Randomness)
-        // High entropy = highly random (like an MD5 hash). Low entropy = human readable (like Opera.exe)
-        function calculateEntropy(str) {
-            const len = str.length;
-            if (len === 0) return 0;
-            let frequencies = {};
-            for (let i = 0; i < len; i++) {
-                let char = str[i];
-                frequencies[char] = (frequencies[char] || 0) + 1;
-            }
-            let entropy = 0;
-            for (let char in frequencies) {
-                let p = frequencies[char] / len;
-                entropy -= p * (Math.log(p) / Math.log(2));
-            }
-            return entropy;
-        }
-
-        // 🧠 ALGORITHM 2: Levenshtein Distance (Fuzzy String Math)
-        // Measures how many edits it takes to turn string A into string B. Catches svch0st.exe dynamically.
-        function levenshteinDistance(a, b) {
-            if (a.length === 0) return b.length;
-            if (b.length === 0) return a.length;
-            const matrix = Array.from(Array(a.length + 1), () => Array(b.length + 1).fill(0));
-            for (let i = 0; i <= a.length; i++) matrix[i][0] = i;
-            for (let j = 0; j <= b.length; j++) matrix[0][j] = j;
-            for (let i = 1; i <= a.length; i++) {
-                for (let j = 1; j <= b.length; j++) {
-                    const cost = a[i - 1] === b[j - 1] ? 0 : 1;
-                    matrix[i][j] = Math.min(
-                        matrix[i - 1][j] + 1,      // deletion
-                        matrix[i][j - 1] + 1,      // insertion
-                        matrix[i - 1][j - 1] + cost // substitution
-                    );
-                }
-            }
-            return matrix[a.length][b.length];
-        }
-
-        async function handleFileUpload() {
-            const fileInput = document.getElementById('file-picker');
-            const fileNameDisplay = document.getElementById('file-name');
-            if (fileInput.files.length === 0) return;
-            let combinedContent = "";
-            let fileNames = [];
-            for (let i = 0; i < fileInput.files.length; i++) {
-                fileNames.push(fileInput.files[i].name);
-                combinedContent += await fileInput.files[i].text() + "\n";
-            }
-            fileNameDisplay.innerText = fileNames.join(', ');
-            document.getElementById('log-input').value = combinedContent;
-            renderLog();
-        }
-
-        function renderLog() {
+        function executeTargetedParse() {
             const rawText = document.getElementById('log-input').value;
-            if (!rawText) return;
-            currentLogLines = rawText.split('\n');
-            const displayEl = document.getElementById('log-display');
-            displayEl.innerHTML = ''; 
-            const fragment = document.createDocumentFragment();
-            currentLogLines.forEach((line, index) => {
-                const lineEl = document.createElement('div');
-                lineEl.id = `log-L${index}`;
-                let safeLine = line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                if (line.includes('ATTENTION')) lineEl.classList.add('hl-attention');
-                else if (line.includes('No File')) lineEl.classList.add('hl-nofile');
-                lineEl.innerHTML = safeLine || '&nbsp;';
-                fragment.appendChild(lineEl);
-            });
-            displayEl.appendChild(fragment);
-            document.querySelector('.input-group').style.display = 'none'; 
-            document.getElementById('utility-bar').style.display = 'flex';
-        }
+            if (!rawText) return alert("Please paste log data first.");
 
-        // --- THE COGNITIVE PARSER LOOP ---
-        function runCognitiveParse() {
-            const logData = document.getElementById('log-input').value;
-            if (!logData) return alert("Please load a log first.");
+            const lines = rawText.split('\n');
+            let detectedLines = [];
+            let fixlistCommands = [];
 
-            let lines = logData.split('\n');
-            let matchedThreatRecords = [];
-            let currentTrackedSection = "Initialization";
-            globalThreatMemory.clear();
+            // Targeted Target Pattern Definitions
+            const regexHashFolder = /\\AppData\\(Local|Roaming)\\[a-f0-9]{32}\b/i;
+            const regexScriptsInAppData = /\\AppData\\.*\.(ps1|vbs|bat|cmd)\b/i;
 
-            let countHigh = 0, countMed = 0, countLow = 0;
-            let autoScriptCommandsOutput = [];
-
-            // Pass 1: Global Context Mapping (Memory generation)
-            for (let line of lines) {
-                let lowerLine = line.toLowerCase();
-                // Extract file paths to memory to see if they appear in multiple bad places
-                let pathMatch = lowerLine.match(/[a-z]:\\[^\s]+\.exe/i);
-                if (pathMatch) {
-                    globalThreatMemory.add(pathMatch[0]);
-                }
-            }
-
-            // Pass 2: Cognitive Evaluation
             for (let line of lines) {
                 let cleanLine = line.trim();
                 let lowerLine = cleanLine.toLowerCase();
                 if (!cleanLine) continue;
 
-                if (cleanLine.startsWith('====================') && cleanLine.trim().endsWith('====================')) {
-                    currentTrackedSection = cleanLine.replace(/=/g, '').trim();
+                // CONSTRAINT: Completely ignore entries containing "No File"
+                if (lowerLine.includes("=> no file") || lowerLine.includes("(no file)")) {
                     continue;
                 }
 
-                // Ignore orphaned files and trusted whitelists
-                if (lowerLine.includes("=> no file") || lowerLine.includes("(no file)")) continue;
-                if (/(opera|zoom|brave|adobe|gigabyte|ubisoft|overwolf)/i.test(lowerLine)) continue;
+                let isMatch = false;
 
-                let score = 0;
-                let indicators = [];
-
-                // 🧠 ALGORITHMIC CHECK: Entropy & Typosquatting
-                // Extract standalone file names or last folder names
-                let nameMatch = cleanLine.match(/\\([^\\]+\.[a-z0-9]{3,4})\b/i) || cleanLine.match(/\\([^\\]+)\b$/i);
-                if (nameMatch) {
-                    let targetName = nameMatch[1];
-                    let lowerTarget = targetName.toLowerCase();
-                    
-                    // Entropy Math
-                    let entropyVal = calculateEntropy(targetName);
-                    if (targetName.length > 15 && entropyVal > 3.8) {
-                        score += 50;
-                        indicators.push(`<span class="math-badge">Shannon Math</span> Algorithm detected high entropy string randomness: (${entropyVal.toFixed(2)}) -> Probable Hash Drop`);
-                    }
-
-                    // Levenshtein Math (Check if it's trying to fake a system file)
-                    if (lowerTarget.endsWith('.exe')) {
-                        for (let sysFile of coreSystemBinaries) {
-                            let distance = levenshteinDistance(lowerTarget, sysFile);
-                            if (distance === 1 || distance === 2) {
-                                score += 80;
-                                indicators.push(`<span class="math-badge">Levenshtein Math</span> Algorithm caught typosquatting. Target [${lowerTarget}] is ${distance} edit(s) away from legitimate [${sysFile}]`);
-                            }
-                        }
-                    }
+                // 1. Check for explicit ATTENTION flags
+                if (cleanLine.includes("<==== ATTENTION")) {
+                    isMatch = true;
+                }
+                // 2. Check for random hash naming directories in AppData
+                else if (regexHashFolder.test(cleanLine)) {
+                    isMatch = true;
+                }
+                // 3. Check for scripts (.ps1, .vbs, .bat, .cmd) dropped inside AppData locations
+                else if (regexScriptsInAppData.test(cleanLine)) {
+                    isMatch = true;
                 }
 
-                // Standard Heuristics (Location / Behavior)
-                if (lowerLine.includes('disableantispyware') || lowerLine.includes('tamperprotection: 0')) { score += 100; indicators.push("Critical Antivirus interdiction detected."); }
-                if (lowerLine.includes('\\appdata\\local\\temp\\') && lowerLine.includes('.exe')) { score += 40; indicators.push("Executable payload in volatile Temp space."); }
-                if (lowerLine.includes('\\appdata\\roaming\\') && lowerLine.includes('.exe')) { score += 35; indicators.push("Unmanaged binary execution in Roaming profile."); }
-                if (cleanLine.match(/\.(pdf|jpg|png|doc)\.(exe|vbs|bat|scr)/i)) { score += 75; indicators.push("Double extension masquerading structure."); }
-                if (cleanLine.includes('powershell') && cleanLine.match(/-enc|-encodedcommand/i)) { score += 90; indicators.push("Obfuscated Base64 PowerShell instruction stream."); }
+                if (isMatch) {
+                    detectedLines.push(cleanLine);
 
-                // 🧠 Relational Context Matcher
-                if (score > 20 && (lowerLine.includes("task:") || lowerLine.includes("run\\") || lowerLine.includes("winlogon"))) {
-                    score += 25; indicators.push(`<span class="math-badge">Memory Logic</span> Correlated persistence hook tied to flagged file system payload.`);
-                }
+                    // Compile directly to clean FRST deletion commands
+                    let cmd = cleanLine.replace(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2} - /, '');
+                    cmd = cmd.replace(/ <==== ATTENTION$/, '');
+                    if (cmd.match(/^____[A-Z\s\(\)]+\s/)) {
+                        cmd = cmd.replace(/^____[A-Z\s\(\)]+\s/, '');
+                    }
+                    cmd = cmd.replace(/\s\[\d+.*\].*$/, '');
 
-                if (score >= 35) {
-                    let band = score >= 75 ? "High" : score >= 50 ? "Medium" : "Low";
-                    if (band === "High") countHigh++; else if (band === "Medium") countMed++; else countLow++;
+                    if (cmd.match(/^[a-zA-Z]:\\/) && !cmd.includes('.')) {
+                        cmd = `Folder: ${cmd}`;
+                    }
 
-                    matchedThreatRecords.push({ score: score, risk: band, type: indicators.join('<br>'), line: cleanLine });
-
-                    let optimizedScriptLine = cleanLine.replace(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2} - /, '').replace(/ <==== ATTENTION$/, '').replace(/^____[A-Z\s\(\)]+\s/, '').replace(/\s\[\d+.*\].*$/, '');
-                    if (optimizedScriptLine.match(/^[a-zA-Z]:\\/) && !optimizedScriptLine.includes('.')) optimizedScriptLine = `Folder: ${optimizedScriptLine}`;
-                    if (!autoScriptCommandsOutput.includes(optimizedScriptLine) && !optimizedScriptLine.startsWith('====================')) {
-                        autoScriptCommandsOutput.push(optimizedScriptLine);
+                    if (!fixlistCommands.includes(cmd) && !cmd.startsWith('=====')) {
+                        fixlistCommands.push(cmd);
                     }
                 }
             }
 
-            // Render Output
-            matchedThreatRecords.sort((a, b) => b.score - a.score);
-            const tbodyEl = document.getElementById('threat-tbody');
-            tbodyEl.innerHTML = '';
-            matchedThreatRecords.forEach(record => {
-                let riskClass = record.risk === "High" ? "risk-high" : record.risk === "Medium" ? "risk-med" : "risk-low";
-                tbodyEl.innerHTML += `<tr><td><b style="color: #ffeb3b;">${record.score}</b></td><td class="${riskClass}">${record.risk}</td><td><span class="reason-badge">${record.type}</span></td><td style="word-break:break-all; font-family:monospace; font-size:10px;">${escapeHTML(record.line)}</td></tr>`;
-            });
+            // Print output directly as a flat text list
+            const hitsContainer = document.getElementById('hits-output');
+            if (detectedLines.length === 0) {
+                hitsContainer.textContent = "Clean scan: No target indicators matched the current definitions rule set.";
+            } else {
+                hitsContainer.textContent = detectedLines.join('\n');
+            }
 
-            document.getElementById('summary-stats').innerHTML = `<span style="color:#ff4757">🔴 High: ${countHigh}</span> | <span style="color:#ffa502">🟠 Medium: ${countMed}</span> | <span style="color:#eccc68">🟡 Low: ${countLow}</span>`;
-            document.getElementById('auto-fixlist-area').value = `Start::\nSystemRestore: On\nCreateRestorePoint:\nCloseProcesses:\n\n${autoScriptCommandsOutput.join('\n')}\n\nEmptyTemp:\nHosts:\nEnd::`;
-            openModal('auto-parse-modal');
-        }
-
-        function escapeHTML(str) { return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
-        function openModal(id) { document.getElementById(id).style.display = 'flex'; }
-        function closeModal(id) { document.getElementById(id).style.display = 'none'; }
-        function copyResults(textareaId, buttonId) {
-            const resultsArea = document.getElementById(textareaId);
-            resultsArea.select(); document.execCommand('copy');
-            document.getElementById(buttonId).innerText = 'Copied!';
+            // Print flat structural script syntax
+            document.getElementById('fixlist-output').value = `Start::\nSystemRestore: On\nCreateRestorePoint:\nCloseProcesses:\n\n${fixlistCommands.join('\n')}\n\nEmptyTemp:\nHosts:\nEnd::`;
         }
     </script>
 </body>
