@@ -495,7 +495,7 @@ End::</textarea>
         }
         class ThreatFinding {
             constructor(item, score, reasons, type, line) {
-                this.item = item; this.score = score; this.reasons = reasons; this.type = type; this.line = line;
+                this.item = item; this.score = score; this.reasons = reasons; this.type = type; this.line = line || "";
             }
         }
 
@@ -654,10 +654,10 @@ End::</textarea>
                 let score = 0;
 
                 if (Patterns.SUSPECT_EXT.test(lower) && (lower.includes('appdata') || lower.includes('temp') || lower.includes('public'))) {
-                    score += 55; reasons.push('Unmanaged script vector drop matched inside application parameters');
+                    score += 55; reasons.push('Unmanaged script vector drop');
                 }
                 if (Patterns.DOUBLE_EXT.test(lower)) {
-                    score += 70; reasons.push('Double extension payload configuration matched');
+                    score += 70; reasons.push('Double extension configuration matched');
                 }
 
                 if (score >= 35) {
@@ -960,7 +960,8 @@ End::</textarea>
         });
 
         function escapeHTML(str) { 
-            if (!str) return '';
+            if (str === null || str === undefined) return '';
+            if (typeof str !== 'string') str = String(str);
             return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); 
         }
     </script>
