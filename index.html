@@ -3,212 +3,904 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FRST Analyzer Pro v2.0 (SOAR Engine)</title>
+    <title>FRST Log Analyzer Pro v2.5 (SOAR Heuristics Matrix)</title>
     <style>
         :root {
-            --bg-color: #1a1a1a; --text-color: #d4d4d4; --container-bg: #2d2d2d;
-            --primary: #007acc; --border: #444; --high-risk: #ff4757;
-            --med-risk: #ffa502; --low-risk: #eccc68; --safe: #2ed573;
+            --bg-color: #1e1e1e;
+            --text-color: #d4d4d4;
+            --container-bg: #2d2d2d;
+            --primary-color: #007acc;
+            --parse-color: #0056b3;
+            --border-color: #444;
+            --attention-color: #ff5555;
+            --nofile-color: #00ff66;
+            --yellow-flag: #ffff00;
+            --orange-flag: #ff7700;
+            --copied-bg: rgba(255, 255, 255, 0.15);
         }
-        body { font-family: 'Courier New', monospace; margin: 0; padding: 10px; background: var(--bg-color); color: var(--text-color); font-size: 12px; }
-        .box { background: var(--container-bg); padding: 10px; border: 1px solid var(--border); border-radius: 4px; margin-bottom: 10px; }
-        textarea { width: 100%; background: #111; color: var(--text-color); border: 1px solid var(--border); padding: 8px; box-sizing: border-box; font-family: monospace; }
-        #log-input { height: 100px; }
-        #fixlist-output { height: 150px; color: #ffeb3b; }
-        button { background: var(--primary); color: white; border: none; padding: 8px 12px; cursor: pointer; font-weight: bold; border-radius: 4px; margin-top: 5px; }
-        button:hover { opacity: 0.8; }
-        .btn-red { background: var(--high-risk); }
-        .btn-green { background: var(--safe); }
-        
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        th, td { border: 1px solid var(--border); padding: 6px; text-align: left; }
-        th { background: #222; }
-        .score-100 { color: var(--high-risk); font-weight: bold; }
-        .score-60 { color: var(--med-risk); font-weight: bold; }
-        .score-20 { color: var(--low-risk); }
 
-        .split-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-        @media (max-width: 800px) { .split-grid { grid-template-columns: 1fr; } }
+        body {
+            font-family: 'Courier New', Courier, monospace;
+            margin: 0;
+            padding: 4px; 
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-size: 11px; 
+            padding-bottom: 80px;
+        }
+
+        .input-group {
+            background: var(--container-bg);
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid var(--border-color);
+            margin-bottom: 10px;
+        }
+
+        textarea#log-input {
+            width: 100%;
+            height: 80px;
+            background: #111;
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+            padding: 8px;
+            box-sizing: border-box;
+            border-radius: 4px;
+            resize: vertical;
+        }
+
+        .file-input-wrapper {
+            margin-top: 8px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        input[type="file"] {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0,0,0,0);
+            border: 0;
+        }
+
+        .custom-file-upload {
+            background: #444;
+            padding: 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            display: inline-block;
+            border: 1px solid var(--border-color);
+        }
+
+        #utility-bar {
+            display: none;
+            background: var(--container-bg);
+            padding: 6px;
+            margin-bottom: 8px;
+            border-radius: 4px;
+            border: 1px solid var(--border-color);
+            flex-direction: column;
+            gap: 6px;
+        }
+        
+        .utility-row {
+            display: flex;
+            gap: 6px;
+            width: 100%;
+        }
+
+        #utility-bar select, #utility-bar input {
+            flex: 1;
+            background: #111;
+            color: white;
+            border: 1px solid var(--border-color);
+            padding: 6px;
+            border-radius: 4px;
+            font-size: 11px;
+            min-width: 0;
+        }
+
+        button {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 16px;
+        }
+
+        button:active { opacity: 0.8; }
+        .btn-block { width: 100%; margin-top: 10px; }
+
+        #log-display {
+            background: var(--container-bg);
+            border: 1px solid var(--border-color);
+            padding: 6px; 
+            white-space: pre; 
+            overflow-x: auto; 
+            min-height: 60vh;
+            width: 100%;
+            box-sizing: border-box;
+            border-radius: 4px;
+            font-size: 11px; 
+            line-height: 1.4;
+            user-select: text;
+        }
+
+        #log-display div { 
+            padding: 2px 4px; 
+            cursor: pointer;
+            border-left: 3px solid transparent;
+            transition: background-color 0.2s, border-color 0.2s;
+        }
+
+        #log-display div:active {
+            background-color: rgba(255,255,255,0.05);
+        }
+
+        .hl-attention { color: var(--attention-color) !important; font-weight: bold; }
+        .hl-nofile { color: var(--nofile-color) !important; font-weight: bold; }
+        .hl-yellow { color: var(--yellow-flag) !important; font-weight: bold; background-color: rgba(255, 255, 0, 0.08); }
+        .hl-orange { color: var(--orange-flag) !important; font-weight: bold; background-color: rgba(255, 119, 0, 0.12); }
+        .hl-copied { background-color: var(--copied-bg) !important; border-left: 3px solid var(--primary-color) !important; }
+
+        .footer-nav {
+            position: fixed;
+            bottom: 0; left: 0; right: 0;
+            background: #111;
+            padding: 10px;
+            display: flex;
+            gap: 6px;
+            box-shadow: 0 -4px 10px rgba(0,0,0,0.5);
+            z-index: 100;
+        }
+        .footer-nav button { flex: 1; margin: 0; font-size: 13px; padding: 10px 4px; }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8);
+            z-index: 200;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content {
+            background: var(--bg-color);
+            padding: 20px;
+            border-radius: 8px;
+            width: 95%;
+            max-width: 800px;
+            max-height: 85vh;
+            overflow-y: auto;
+            border: 1px solid var(--border-color);
+            position: relative;
+            box-sizing: border-box;
+        }
+
+        .close-btn {
+            position: absolute;
+            top: 10px; right: 15px;
+            font-size: 28px;
+            cursor: pointer;
+            color: #aaa;
+            font-family: sans-serif;
+        }
+
+        input[type="text"], textarea.form-control {
+            width: 100%;
+            padding: 12px;
+            background: var(--container-bg);
+            color: white;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            box-sizing: border-box;
+            font-size: 16px;
+            margin-top: 8px;
+            margin-bottom: 12px;
+        }
+
+        textarea.output-box {
+            width: 100%;
+            background: var(--container-bg);
+            color: white;
+            border: 1px solid var(--border-color);
+            padding: 8px;
+            box-sizing: border-box;
+            white-space: pre;
+            overflow-x: auto;
+            font-size: 11px;
+            font-family: monospace;
+        }
+
+        .helper-section {
+            border: 1px solid #444;
+            background: #252525;
+            padding: 10px;
+            margin-bottom: 12px;
+            border-radius: 4px;
+        }
+        .helper-title {
+            font-weight: bold;
+            color: var(--primary-color);
+            margin-bottom: 5px;
+            display: flex;
+            justify-content: space-between;
+            font-size: 13px;
+        }
+        .helper-body {
+            white-space: pre-wrap;
+            background: #111;
+            padding: 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            word-break: break-all;
+            user-select: all;
+        }
+        .delete-btn { color: #ff5555; cursor: pointer; font-size: 12px; }
+        
+        .db-tag {
+            display: inline-block;
+            background: #444;
+            padding: 4px 8px;
+            border-radius: 4px;
+            margin: 4px;
+            font-size: 11px;
+        }
+        .db-tag-orange { color: var(--orange-flag); border: 1px solid var(--orange-flag); }
+        .db-tag-yellow { color: var(--yellow-flag); border: 1px solid var(--yellow-flag); }
+        
+        #toast {
+            display: none;
+            position: fixed;
+            top: 20px; left: 50%;
+            transform: translateX(-50%);
+            background: var(--primary-color);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-weight: bold;
+            z-index: 300;
+            font-size: 13px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.5);
+        }
+
+        .parse-btn {
+            background-color: var(--parse-color);
+            width: auto;
+            padding: 6px 14px;
+            margin-top: 0;
+            font-size: 12px;
+        }
+
+        table.threat-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+            font-size: 11px;
+        }
+        table.threat-table th, table.threat-table td {
+            border: 1px solid var(--border-color);
+            padding: 6px;
+            text-align: left;
+            vertical-align: top;
+        }
+        table.threat-table th { background: #222; }
+        .risk-high { color: #ff4757; font-weight: bold; }
+        .risk-med { color: #ffa502; font-weight: bold; }
+        .risk-low { color: #eccc68; }
+        .reason-badge {
+            font-size: 9px;
+            background: #111;
+            padding: 2px 4px;
+            border-radius: 3px;
+            margin-top: 3px;
+            display: block;
+            color: #aaa;
+        }
     </style>
 </head>
 <body>
 
-    <div class="box">
-        <h2>🛠️ FRST Log Input (v2.0 Engine)</h2>
-        <textarea id="log-input" placeholder="Paste your FRST.txt or Addition.txt log here..."></textarea>
-        <button onclick="runForensicEngine()">⚡ Run Advanced Analysis</button>
+    <div id="toast">Copied to clipboard!</div>
+
+    <div class="input-group">
+        <textarea id="log-input" placeholder="Paste FRST log here..."></textarea>
+        <div class="file-input-wrapper">
+            <label class="custom-file-upload">
+                <input type="file" id="file-picker" accept=".txt" multiple onchange="handleFileUpload()">
+                📁 Upload Logs
+            </label>
+            <span id="file-name" style="font-size:12px; color:#888;">No file selected</span>
+        </div>
+        <button class="btn-block" onclick="renderLog()">Process & Load Log</button>
     </div>
 
-    <div class="split-grid">
-        <div class="box" id="threat-summary-box" style="display:none;">
-            <h3 style="margin-top:0;">🚨 Threat Intelligence Summary</h3>
-            <div id="summary-stats" style="margin-bottom: 10px; font-size: 14px;"></div>
-            <div style="overflow-x: auto; max-height: 300px;">
-                <table id="threat-table">
-                    <thead><tr><th>Score</th><th>Risk</th><th>Threat Type</th><th>Detected Line</th></tr></thead>
+    <div id="utility-bar">
+        <div class="utility-row">
+            <select id="section-jumper" onchange="jumpToSection()">
+                <option value="">-- Jump to Section --</option>
+            </select>
+        </div>
+        <div class="utility-row">
+            <input type="text" id="live-filter" placeholder="🔍 Filter log view..." oninput="filterLogView()">
+            <button class="parse-btn" id="master-parse-trigger" onclick="runAutoParse()">⚡ Parse via Heuristics Engine</button>
+        </div>
+    </div>
+
+    <div id="log-display">Log data will render here...</div>
+
+    <div class="footer-nav">
+        <button onclick="openModal('tools-modal')">🛠️ Tools</button>
+        <button style="background-color: #e67e22;" onclick="openModal('fixlist-modal')">📝 View Fixlist</button>
+        <button style="background-color: #2b8a3e;" onclick="openHelperModal()">📋 Helper GUI</button>
+    </div>
+
+    <div id="auto-parse-modal" class="modal">
+        <div class="modal-content" style="max-width: 850px;">
+            <span class="close-btn" onclick="closeModal('auto-parse-modal')">&times;</span>
+            <h2>⚡ Core v2.5 Threat Score Analysis Matrix</h2>
+            
+            <div id="summary-stats" style="margin-bottom: 12px; font-size: 13px; font-weight: bold;"></div>
+            
+            <div style="overflow-y: auto; max-height: 250px; border: 1px solid var(--border-color); margin-bottom: 15px;">
+                <table class="threat-table">
+                    <thead>
+                        <tr><th style="width:50px;">Score</th><th style="width:70px;">Risk</th><th style="width:180px;">Identified Matrix Vectors</th><th>Context Line Telemetry Record</th></tr>
+                    </thead>
                     <tbody id="threat-tbody"></tbody>
                 </table>
             </div>
-        </div>
 
-        <div class="box" id="fixlist-box" style="display:none;">
-            <h3 style="margin-top:0;">📝 Auto-Generated Fixlist</h3>
-            <p style="margin-top:0; font-size:10px; color:#aaa;">Ready to copy/paste into a fixlist.txt file.</p>
-            <textarea id="fixlist-output" readonly></textarea>
-            <button class="btn-green" onclick="copyFixlist()">📋 Copy Fixlist</button>
+            <h3 style="color: var(--orange-flag); margin-bottom: 5px; font-size: 13px;">📋 Auto-Compiled Script Workspace</h3>
+            <p style="font-size: 10px; margin-top: 0; color: #aaa;">Pre-compiled cleanup directives (Excludes "No File" entries and "Reboot:").</p>
+            <textarea id="auto-fixlist-area" class="output-box" style="height: 140px;" readonly></textarea>
+            <button id="copy-auto-fix-btn" class="btn-block" onclick="copyResults('auto-fixlist-area', 'copy-auto-fix-btn')" style="background-color: #e67e22;">Copy Script Commands</button>
+        </div>
+    </div>
+
+    <div id="tools-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn" onclick="closeModal('tools-modal')">&times;</span>
+            <h2>Tools Extraction</h2>
+            <p>Type keywords to pull explicit telemetry matches manually.</p>
+            <input type="text" id="tool-instruction" placeholder="e.g., ATTENTION or Task:">
+            <button class="btn-block" onclick="processInstruction()">Extract Lines</button>
+        </div>
+    </div>
+
+    <div id="results-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn" onclick="closeModal('results-modal')">&times;</span>
+            <h2>Extracted Results</h2>
+            <textarea id="results-area" class="output-box" style="height: 240px;" readonly></textarea>
+            <button id="copy-btn" class="btn-block" onclick="copyResults('results-area', 'copy-btn')">Copy All</button>
+        </div>
+    </div>
+
+    <div id="fixlist-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn" onclick="closeModal('fixlist-modal')">&times;</span>
+            <h2>Fixlist Workspace</h2>
+            <textarea id="fixlist-area" class="output-box" style="height: 240px;">Start::
+SystemRestore: On
+CreateRestorePoint:
+CloseProcesses:
+
+EmptyTemp:
+Hosts:
+End::</textarea>
+            
+            <div style="display: flex; gap: 10px; margin-top: 10px;">
+                <button id="copy-fix-btn" style="flex: 1; background-color:#e67e22;" onclick="copyResults('fixlist-area', 'copy-fix-btn')">Copy</button>
+                <button style="flex: 1; background-color:#2980b9;" onclick="downloadFixlist()">💾 Save .txt</button>
+            </div>
+            
+            <button class="btn-block" style="background-color:#555; margin-top:10px;" onclick="clearFixlist()">Reset Template</button>
+        </div>
+    </div>
+
+    <div id="helper-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn" onclick="closeModal('helper-modal')">&times;</span>
+            
+            <h2>Process Manual Query</h2>
+            <div style="border: 1px dashed var(--primary-color); padding: 10px; margin-bottom: 20px; border-radius:4px;">
+                <label><b>Search Entry:</b></label>
+                <input type="text" id="lookup-filename-input" placeholder="e.g., badfile.sys or svchost.exe">
+                <button class="btn-block" style="background-color: var(--primary-color);" onclick="runManualSearchQuery()">Search Web Entry</button>
+            </div>
+
+            <h2>Flagging Databases</h2>
+            <div style="border: 1px dashed #666; padding: 10px; margin-bottom: 20px; border-radius:4px;">
+                <label><b>Enter Path, Keyword, or Regex:</b></label>
+                <input type="text" id="db-keyword-input" placeholder="e.g., AppData\Local\RenPy">
+                
+                <div style="display:flex; gap:10px; margin-top:5px;">
+                    <button style="flex:1; background-color: #f39c12; font-size:13px; padding:10px;" onclick="saveDatabaseKeyword('yellow')">Flag Yellow</button>
+                    <button style="flex:1; background-color: #d35400; font-size:13px; padding:10px;" onclick="saveDatabaseKeyword('orange')">Flag Orange 🌟</button>
+                </div>
+                
+                <div id="db-keywords-holder" style="margin-top:15px;"></div>
+            </div>
+
+            <h2>Helper Notes Storage</h2>
+            <div style="border: 1px dashed #555; padding: 10px; margin-bottom: 15px; border-radius:4px;">
+                <label><b>Section Title:</b></label>
+                <input type="text" id="helper-input-section" placeholder="e.g., Extra Commands">
+                <label><b>Saved Content:</b></label>
+                <textarea id="helper-input-text" class="form-control" style="height:70px;" placeholder="Paste text here..."></textarea>
+                <button class="btn-block" onclick="saveHelperEntry()">Save Snippet Entry</button>
+            </div>
+
+            <h3>Your Saved Sections</h3>
+            <div id="helper-saved-list"></div>
         </div>
     </div>
 
     <script>
-        // --- 1. THE THREAT MATRIX (Confidence Scoring & Signatures) ---
-        const threatMatrix = [
-            // HIGH RISK (Score 90-100)
-            { id: "md5_folder", regex: /\\AppData\\Local\\[a-f0-9]{32}\b/i, score: 100, risk: "High", type: "MD5 Hash Folder" },
-            { id: "defender_disable", regex: /DisableAntiSpyware|DisableAntiVirus|TamperProtection: 0/i, score: 100, risk: "High", type: "Security Disabled" },
-            { id: "encoded_ps", regex: /-EncodedCommand|-enc\s/i, score: 95, risk: "High", type: "Encoded PowerShell" },
-            { id: "lolbin", regex: /\\(temp|appdata|programdata).*\\(pythonw|certutil|mshta|wmic)\.exe/i, score: 90, risk: "High", type: "LOLBin Abuse" },
-            { id: "random_sys32", regex: /\\System32\\[a-f0-9-]{16,}\.exe/i, score: 90, risk: "High", type: "Randomized Sys32 Binary" },
+        let currentLogLines = [];
+        const initialFixlistTemplate = `Start::\nSystemRestore: On\nCreateRestorePoint:\nCloseProcesses:\n\nEmptyTemp:\nHosts:\nEnd::`;
+
+        const frstSections = ["processes", "registry", "scheduled tasks", "internet", "services", "drivers", "netsvcs", "one month (created)", "one month (modified)", "files in root", "sigcheck"];
+        const additionSections = ["accounts", "security center", "installed programs", "packages", "custom clsid", "codecs", "shortcuts & wmi", "loaded modules", "alternate data streams", "safe mode", "association", "internet explorer", "hosts content", "network", "other areas", "msconfig", "firewallrules", "restore points", "faulty device manager", "event log errors", "memory info", "drives", "mbr & partition table"];
+
+        const appWhitelist = ['microsoft corporation', 'nvidia corporation', 'valve corp', 'steamapps', 'google llc'];
+
+        function safeGetStorage(key, defaultVal) {
+            try { return JSON.parse(localStorage.getItem(key)) || defaultVal; } catch (e) { return defaultVal; }
+        }
+        function safeSetStorage(key, val) {
+            try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) { console.warn("Storage restricted."); }
+        }
+
+        async function handleFileUpload() {
+            const fileInput = document.getElementById('file-picker');
+            const fileNameDisplay = document.getElementById('file-name');
+            if (fileInput.files.length === 0) return;
             
-            // MEDIUM RISK (Score 50-80)
-            { id: "renpy", regex: /\\RenPy\\/i, score: 60, risk: "Medium", type: "RenPy Game Folder" },
-            { id: "kms_hook", regex: /SppExtComObjHook\.dll|KMS/i, score: 70, risk: "Medium", type: "KMS Emulator / Hook" },
-            { id: "orphaned_fw", regex: /FirewallRules:.*=> No File/i, score: 50, risk: "Medium", type: "Orphaned Firewall Rule" },
+            let fileNames = [];
+            let combinedContent = "";
+
+            for (let i = 0; i < fileInput.files.length; i++) {
+                let file = fileInput.files[i];
+                fileNames.push(file.name);
+                let text = await file.text();
+                if(i > 0) combinedContent += `\n==================== End of Previous Log ====================\n\n`;
+                combinedContent += text + "\n";
+            }
+
+            fileNameDisplay.innerText = fileNames.join(', ');
+            document.getElementById('log-input').value = combinedContent;
+            renderLog();
+        }
+
+        function renderLog() {
+            const rawText = document.getElementById('log-input').value;
+            if (!rawText) return;
             
-            // LOW RISK (Score 20-40)
-            { id: "dead_task", regex: /Task:.*=> No File/i, score: 30, risk: "Low", type: "Dead Scheduled Task" },
-            { id: "generic_attention", regex: /<==== ATTENTION/i, score: 40, risk: "Low", type: "FRST System Flag" }
-        ];
+            currentLogLines = rawText.split('\n');
+            const displayEl = document.getElementById('log-display');
+            displayEl.innerHTML = ''; 
+            
+            const jumper = document.getElementById('section-jumper');
+            jumper.innerHTML = '<option value="">-- Jump to Section --</option>';
 
-        // Safe signatures to ignore
-        const whitelist = ['microsoft corporation', 'nvidia corporation', 'valve', 'steamapps', 'google llc'];
+            const frstGroup = document.createElement('optgroup');
+            frstGroup.label = "─── FRST.txt Sections ───";
+            const additionGroup = document.createElement('optgroup');
+            additionGroup.label = "─── Addition.txt Sections ───";
 
-        // --- 2. THE PARSER ENGINE ---
-        function runForensicEngine() {
-            const rawLog = document.getElementById('log-input').value;
-            if (!rawLog) return alert("Please paste a log first.");
+            const fragment = document.createDocumentFragment();
 
-            const lines = rawLog.split('\n');
-            let currentSection = "Unknown";
-            let detectedThreats = [];
+            currentLogLines.forEach((line, index) => {
+                const lineEl = document.createElement('div');
+                lineEl.id = `log-L${index}`;
+                
+                if (line.startsWith('====================') && line.trim().endsWith('====================')) {
+                    const cleanTitle = line.replace(/=/g, '').trim();
+                    const lowerTitle = cleanTitle.toLowerCase();
+                    const opt = document.createElement('option');
+                    opt.value = `log-L${index}`;
+                    opt.textContent = cleanTitle;
 
-            // Read line by line
+                    if (frstSections.some(sec => lowerTitle.includes(sec))) frstGroup.appendChild(opt);
+                    else if (additionSections.some(sec => lowerTitle.includes(sec))) additionGroup.appendChild(opt);
+                    else frstGroup.appendChild(opt);
+                }
+
+                let safeLine = line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                
+                if (line.includes('ATTENTION')) lineEl.classList.add('hl-attention');
+                else if (line.includes('No File')) lineEl.classList.add('hl-nofile');
+
+                lineEl.innerHTML = safeLine || '&nbsp;';
+                fragment.appendChild(lineEl);
+            });
+            
+            if (frstGroup.children.length > 0) jumper.appendChild(frstGroup);
+            if (additionGroup.children.length > 0) jumper.appendChild(additionGroup);
+
+            displayEl.appendChild(fragment);
+            document.querySelector('.input-group').style.display = 'none'; 
+            document.getElementById('utility-bar').style.display = 'flex';
+        }
+
+        // --- 4. ENGINE v2.5 HEURISTIC WEIGHTED CALCULATION MATRIX ---
+        function evaluateHeuristicMetrics(line, sectionContext) {
+            let score = 0;
+            let indicators = [];
+            let lower = line.toLowerCase();
+
+            // Safety Exclusions
+            if (appWhitelist.some(vendor => lower.includes(vendor))) {
+                return { score: 0, indicators: [] };
+            }
+
+            // 1. Path-Location Analysis Rules
+            if (lower.includes('\\appdata\\local\\temp\\')) {
+                score += 20; indicators.push("Temp execution directory path");
+                if (lower.includes('.exe')) { score += 30; indicators.push("Binary execution inside temporary directory boundary"); }
+            }
+            if (lower.includes('\\appdata\\roaming\\')) {
+                score += 15; indicators.push("Roaming application scope path");
+                if (lower.includes('.exe')) { score += 25; indicators.push("Unmanaged binary execution loop in Roaming profile"); }
+            }
+            if (lower.includes('\\appdata\\local\\') && !lower.includes('\\appdata\\local\\temp\\')) {
+                if (lower.match(/\\[^\\]+\.exe/i)) { score += 25; indicators.push("Direct executable runtime deployment root in Local AppData"); }
+            }
+            if (lower.includes('\\programdata\\')) {
+                if (lower.includes('.exe')) { score += 30; indicators.push("Executable profile file stored inside global ProgramData share"); }
+            }
+            if (lower.includes('\\windows\\temp\\')) {
+                if (lower.includes('.exe')) { score += 35; indicators.push("Restricted operational environment boundary script/executable execution"); }
+            }
+            if (lower.includes('\\users\\public\\')) {
+                if (lower.includes('.exe')) { score += 30; indicators.push("Public shared payload entry storage pathway target executable"); }
+            }
+            if (lower.includes('\\users\\') && lower.includes('\\desktop\\')) {
+                if (lower.includes('.exe')) { score += 15; indicators.push("User interface interactive run executable on active Desktop structure"); }
+            }
+
+            // 2. Structural Name Cryptographic & Obfuscation Analysis
+            if (/\b[a-f0-9]{32}\b/i.test(line)) { score += 50; indicators.push("Hexadecimal MD5 pattern container format string directory reference"); }
+            if (/\b[a-f0-9]{64}\b/i.test(line)) { score += 55; indicators.push("Hexadecimal SHA256 cryptographic sequence file definition string"); }
+            if (/\{[A-F0-9]{8}-[A-F0-9]{4}-[A-F0-9]{4}-[A-F0-9]{4}-[A-F0-9]{12}\}/i.test(line)) { score += 30; indicators.push("Braced object GUID operational path sequence marker allocation"); }
+            if (/\.(pdf|jpg|png|doc|docx|txt|xls|mp3|mp4)\.(exe|vbs|bat|cmd|scr|pif|js)/i.test(line)) { score += 60; indicators.push("Double extension wrapper payload masquerading detection rule"); }
+            if (/\\(svch0st|expl0rer|winl0gon|taskm9r)\.exe/i.test(lower)) { score += 65; indicators.push("Core OS service name mimicry typosquatting string structure match"); }
+            if (lower.includes('svchost.exe') && !lower.includes('\\windows\\system32\\') && !lower.includes('\\windows\\syswow64\\')) {
+                score += 50; indicators.push("Core background runtime proxy image masquerading outside System32 folder");
+            }
+
+            // 3. Script Engine File-Type Location Tracking Deviations
+            let extensionCapture = lower.match(/\.(vbs|ps1|scr|jar|py|bat|cmd|tmp)\b/i);
+            if (extensionCapture) {
+                let matchedExt = extensionCapture[1];
+                if (!lower.includes('\\windows\\system32') && !lower.includes('\\program files')) {
+                    score += 25; indicators.push(`Script execution architecture vector signature drop detected: .${matchedExt}`);
+                }
+            }
+
+            // 4. Behavioral Metadata Indicators
+            if (lower.includes('[file not signed]')) { score += 15; indicators.push("Cryptographic publisher digital verification trace signature missing"); }
+            if (lower.includes('[file is in use]')) { score += 20; indicators.push("Active kernel reference lock state trace indicator line"); }
+            if (lower.includes('disableantispyware') || lower.includes('disableantivirus') || lower.includes('tamperprotection: 0')) {
+                score += 80; indicators.push("Antivirus security protection system registry interdiction command");
+            }
+
+            // 5. Shared Target Core Dependencies Correlation Lookups
+            if (sectionContext.toLowerCase().includes("scheduled tasks") || lower.includes("task:")) {
+                if (score > 15) { score += 30; indicators.push("Persistence matrix linkage matched across active Scheduled Tasks entries"); }
+            }
+            if (sectionContext.toLowerCase().includes("registry") || lower.includes("winlogon") || lower.includes("run\\") || lower.includes("runonce\\")) {
+                if (score > 15) { score += 30; indicators.push("Auto-start persistence configuration modification link mapping"); }
+            }
+            if (lower.includes('\\appdata\\roaming\\renpy\\')) {
+                score += 40; indicators.push("RenPy local framework directory profile tracking validation");
+            }
+
+            // 6. Advanced Native System Administrative Utilities (LOLBins Abuse) Profiling
+            if (lower.includes('powershell.exe') && (lower.includes('-enc') || lower.includes('-encodedcommand') || lower.includes('bypass'))) {
+                score += 60; indicators.push("Base64 stream command block argument logic supplied to command interpreter shell");
+            }
+            if (lower.includes('pythonw.exe') && (lower.includes('\\appdata\\') || lower.includes('\\temp\\'))) {
+                score += 45; indicators.push("Background engine execution profile mapped out of non-standard target path directory");
+            }
+            if (lower.includes('mshta.exe') && (lower.includes('http') || lower.includes('javascript') || lower.includes('vbscript'))) {
+                score += 55; indicators.push("HTML dynamic execution bridge rendering interface pointing to remote network structure");
+            }
+            if (lower.includes('certutil.exe') && (lower.includes('-decode') || lower.includes('-urlcache'))) {
+                score += 50; indicators.push("Windows cert certificate binary handling switches deployed to transform arbitrary streams");
+            }
+            if (lower.includes('regsvr32.exe') && lower.includes('/i:http')) {
+                score += 65; indicators.push("Dynamic Link Library execution loop parsing external code payloads directly");
+            }
+            if ((lower.includes('wscript.exe') || lower.includes('cscript.exe')) && (lower.includes('\\users\\public\\') || lower.includes('\\temp\\'))) {
+                score += 45; indicators.push("Windows Script Host engine operating out of unstructured local memory paths");
+            }
+
+            return { score: score, indicators: indicators };
+        }
+
+        // --- NATIVE CLIENT-SIDE TRIPWIRE CONTROLLER ---
+        function runAutoParse() {
+            const logData = document.getElementById('log-input').value;
+            if (!logData) return alert("Please load a log file setup array pipeline dataset record sequence first.");
+
+            let lines = logData.split('\n');
+            let matchedThreatRecords = [];
+            let currentTrackedSection = "Initialization Matrix Root";
+
+            let countHigh = 0, countMed = 0, countLow = 0;
+            let autoScriptCommandsOutput = [];
+
             for (let line of lines) {
                 let cleanLine = line.trim();
                 let lowerLine = cleanLine.toLowerCase();
                 if (!cleanLine) continue;
 
-                // Section Tracking
-                if (cleanLine.startsWith("===============") && cleanLine.endsWith("===============")) {
-                    currentSection = cleanLine.replace(/=/g, '').trim();
+                // Section Tracking Boundary Mapping
+                if (cleanLine.startsWith('====================') && cleanLine.trim().endsWith('====================')) {
+                    currentTrackedSection = cleanLine.replace(/=/g, '').trim();
                     continue;
                 }
 
-                // Whitelist bypass
-                if (whitelist.some(safe => lowerLine.includes(safe))) continue;
+                // EXPLICIT CONSTRAINT INSTRUCTION: Suppress all "No File" entries from auto-parsing tripwires
+                if (lowerLine.includes("=> no file") || lowerLine.includes("(no file)")) {
+                    continue;
+                }
 
-                // Matrix Matching
-                let matched = false;
-                for (let threat of threatMatrix) {
-                    if (threat.regex.test(cleanLine)) {
-                        detectedThreats.push({
-                            section: currentSection,
-                            line: cleanLine,
-                            score: threat.score,
-                            risk: threat.risk,
-                            type: threat.type
-                        });
-                        matched = true;
-                        break; // Stop checking other rules once highest risk is matched
+                // Heuristics Score Model Processing Block Evaluation
+                let assessment = evaluateHeuristicMetrics(cleanLine, currentTrackedSection);
+
+                if (assessment.score >= 35) {
+                    let band = "Low";
+                    if (assessment.score >= 75) { band = "High"; countHigh++; }
+                    else if (assessment.score >= 50) { band = "Medium"; countMed++; }
+                    else { countLow++; }
+
+                    matchedThreatRecords.push({
+                        score: assessment.score,
+                        risk: band,
+                        type: assessment.indicators.join(', '),
+                        line: cleanLine
+                    });
+
+                    // Format Clean Removal Syntax Output Array Data Blocks
+                    let optimizedScriptLine = cleanLine;
+                    optimizedScriptLine = optimizedScriptLine.replace(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2} - /, '');
+                    optimizedScriptLine = optimizedScriptLine.replace(/ <==== ATTENTION$/, '');
+
+                    if (optimizedScriptLine.match(/^____[A-Z\s\(\)]+\s/)) {
+                        optimizedScriptLine = optimizedScriptLine.replace(/^____[A-Z\s\(\)]+\s/, '');
+                    }
+                    optimizedScriptLine = optimizedScriptLine.replace(/\s\[\d+.*\].*$/, '');
+
+                    let structuralFixCommand = optimizedScriptLine;
+                    if (structuralFixCommand.match(/^[a-zA-Z]:\\/) && !structuralFixCommand.includes('.')) {
+                        structuralFixCommand = `Folder: ${structuralFixCommand}`;
+                    }
+
+                    if (!autoScriptCommandsOutput.includes(structuralFixCommand) && !structuralFixCommand.startsWith('====================')) {
+                        autoScriptCommandsOutput.push(structuralFixCommand);
                     }
                 }
             }
 
-            renderResults(detectedThreats);
-        }
+            // Render Output Processing Elements
+            matchedThreatRecords.sort((first, second) => second.score - first.score);
+            const tbodyEl = document.getElementById('threat-tbody');
+            tbodyEl.innerHTML = '';
 
-        // --- 3. FIXLIST GENERATOR & UI RENDERER ---
-        function renderResults(threats) {
-            // Sort by highest score first
-            threats.sort((a, b) => b.score - a.score);
-
-            const tbody = document.getElementById('threat-tbody');
-            tbody.innerHTML = '';
-            
-            let high = 0, med = 0, low = 0;
-            let fixlistCommands = [];
-
-            threats.forEach(t => {
-                // Tally stats
-                if (t.risk === "High") high++;
-                else if (t.risk === "Medium") med++;
-                else low++;
-
-                // Build Table Row
-                let row = `<tr>
-                    <td class="score-${t.score >= 90 ? '100' : t.score >= 50 ? '60' : '20'}">${t.score}</td>
-                    <td>${t.risk}</td>
-                    <td><b>${t.type}</b></td>
-                    <td style="word-break: break-all;">${escapeHTML(t.line)}</td>
+            matchedThreatRecords.forEach(record => {
+                let riskClass = record.risk === "High" ? "risk-high" : record.risk === "Medium" ? "risk-med" : "risk-low";
+                tbodyEl.innerHTML += `<tr>
+                    <td><b style="color: #ffeb3b;">${record.score}</b></td>
+                    <td class="${riskClass}">${record.risk}</td>
+                    <td>
+                        <span style="font-weight:bold; color:#fff;">Heuristic Match Analysis:</span>
+                        <span class="reason-badge">${record.type}</span>
+                    </td>
+                    <td style="word-break:break-all; font-family:monospace; font-size:10px;">${escapeHTML(record.line)}</td>
                 </tr>`;
-                tbody.innerHTML += row;
-
-                // Build Fixlist Syntax
-                fixlistCommands.push(generateFixCommand(t.line, t.section));
             });
 
-            // Update UI
             document.getElementById('summary-stats').innerHTML = `
-                <span style="color:var(--high-risk)"><b>High:</b> ${high}</span> | 
-                <span style="color:var(--med-risk)"><b>Medium:</b> ${med}</span> | 
-                <span style="color:var(--low-risk)"><b>Low:</b> ${low}</span>
+                <span style="color:#ff4757">🔴 High Suspicious Aggregates (Score &gt;=75): ${countHigh}</span> | 
+                <span style="color:#ffa502">🟠 Medium Severity Suspects (Score 50-74): ${countMed}</span> | 
+                <span style="color:#eccc68">🟡 Low Context Flags (Score 35-49): ${countLow}</span>
             `;
 
-            // Compile Fixlist output
-            const finalFixlist = `Start::\nSystemRestore: On\nCreateRestorePoint:\nCloseProcesses:\n\n${fixlistCommands.join('\n')}\n\nEmptyTemp:\nHosts:\nReboot:\nEnd::`;
-            document.getElementById('fixlist-output').value = finalFixlist;
+            // Compile final automated fix script output block (Drops Reboot:)
+            const compiledFixlistScript = `Start::\nSystemRestore: On\nCreateRestorePoint:\nCloseProcesses:\n\n${autoScriptCommandsOutput.join('\n')}\n\nEmptyTemp:\nHosts:\nEnd::`;
+            document.getElementById('auto-fixlist-area').value = compiledFixlistScript;
 
-            // Show boxes
-            document.getElementById('threat-summary-box').style.display = 'block';
-            document.getElementById('fixlist-box').style.display = 'block';
+            openModal('auto-parse-modal');
         }
 
-        // Extracts the command logic based on the line structure
-        function generateFixCommand(line, section) {
-            let cmd = line;
-            
-            // Clean up FRST dates and ATTENTION tags
-            cmd = cmd.replace(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2} - /, ''); 
-            cmd = cmd.replace(/ <==== ATTENTION$/, '');
+        function runManualSearchQuery() {
+            const inputEl = document.getElementById('lookup-filename-input');
+            const targetEntry = inputEl.value.trim();
+            if(!targetEntry) return;
 
-            // Specific Fix Formatting based on FRST rules
-            if (line.includes("Task:")) {
-                // Return exactly as written to delete task
-                return cmd; 
-            }
-            if (line.includes("FirewallRules:")) {
-                // Return exactly as written to delete rule
-                return cmd; 
-            }
-            if (line.includes("HKLM\\") || line.includes("HKU\\") || line.includes("HKCU\\")) {
-                // Registry keys
-                return cmd;
-            }
-            
-            // If it's just a raw path (like an MD5 folder in One Month Created)
-            if (cmd.match(/^[a-zA-Z]:\\/)) {
-                // If it ends without an extension, assume folder
-                if (!cmd.includes('.')) return `Folder: ${cmd}`;
-                return cmd; // File deletion
-            }
-
-            return cmd; // Fallback
+            const targetUrl = 'https://www.google.com/search?q=' + encodeURIComponent(targetEntry);
+            window.open(targetUrl, '_blank');
         }
 
-        function copyFixlist() {
-            const output = document.getElementById('fixlist-output');
-            output.select();
-            document.execCommand('copy');
-            alert("Fixlist copied to clipboard!");
+        // --- SINGLE-CLICK TO COPY HANDLER EVENT ROUTINES --- //
+        const logDisplay = document.getElementById('log-display');
+        logDisplay.addEventListener('click', function(e) {
+            let targetDiv = e.target.closest('div[id^="log-L"]');
+            if (!targetDiv) return;
+            
+            let idx = parseInt(targetDiv.id.replace('log-L', ''));
+            if(idx >= 0 && idx < currentLogLines.length) {
+                let rawText = currentLogLines[idx];
+                navigator.clipboard.writeText(rawText).then(() => {
+                    targetDiv.classList.add('hl-copied');
+                    const toast = document.getElementById('toast');
+                    toast.style.display = 'block';
+                    setTimeout(() => { toast.style.display = 'none'; }, 1000);
+                });
+            }
+        });
+
+        function jumpToSection() {
+            const targetId = document.getElementById('section-jumper').value;
+            if (!targetId) return;
+            const targetEl = document.getElementById(targetId);
+            if (targetEl) targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        function filterLogView() {
+            const query = document.getElementById('live-filter').value.toLowerCase();
+            const lines = document.getElementById('log-display').getElementsByTagName('div');
+            for (let i = 0; i < lines.length; i++) {
+                if (lines[i].textContent.toLowerCase().includes(query)) lines[i].style.display = '';
+                else lines[i].style.display = 'none';
+            }
+        }
+
+        function clearFixlist() {
+            if(confirm("Reset fixlist container workspace back to default template layout?")) {
+                document.getElementById('fixlist-area').value = initialFixlistTemplate;
+            }
+        }
+
+        function downloadFixlist() {
+            const content = document.getElementById('fixlist-area').value;
+            const blob = new Blob([content], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'fixlist.txt';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        function openModal(id) {
+            document.getElementById(id).style.display = 'flex';
+            if(id === 'tools-modal') document.getElementById('tool-instruction').focus();
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).style.display = 'none';
+        }
+
+        function processInstruction() {
+            const instruction = document.getElementById('tool-instruction').value.trim();
+            if (!instruction) return;
+            let extractedLines = [];
+            for (let line of currentLogLines) {
+                if (line.includes(instruction)) extractedLines.push(line);
+            }
+            document.getElementById('results-area').value = extractedLines.join('\n');
+            closeModal('tools-modal');
+            openModal('results-modal');
+            document.getElementById('copy-btn').innerText = 'Copy All';
+        }
+
+        function copyResults(textareaId, buttonId) {
+            const resultsArea = document.getElementById(textareaId);
+            resultsArea.select();
+            resultsArea.setSelectionRange(0, 99999);
+            navigator.clipboard.writeText(resultsArea.value).then(() => {
+                document.getElementById(buttonId).innerText = 'Copied!';
+            });
+        }
+
+        function openHelperModal() {
+            loadHelperEntries();
+            renderDatabaseKeywords();
+            openModal('helper-modal');
+        }
+
+        function saveDatabaseKeyword(color) {
+            const inputEl = document.getElementById('db-keyword-input');
+            const keyword = inputEl.value.trim();
+            if(!keyword) return;
+
+            let storageKey = color === 'orange' ? 'frst_orange_db' : 'frst_yellow_db';
+            let db = safeGetStorage(storageKey, []);
+            
+            if(!db.includes(keyword)) {
+                db.push(keyword);
+                safeSetStorage(storageKey, db);
+            }
+            inputEl.value = '';
+            renderDatabaseKeywords();
+            if(currentLogLines.length > 0) renderLog();
+        }
+
+        function renderDatabaseKeywords() {
+            const holder = document.getElementById('db-keywords-holder');
+            let yellowDb = safeGetStorage('frst_yellow_db', []);
+            let orangeDb = safeGetStorage('frst_orange_db', []);
+            
+            if(yellowDb.length === 0 && orangeDb.length === 0) {
+                holder.innerHTML = '<p style="font-size:11px; color:#666; margin:0;">Databases empty.</p>';
+                return;
+            }
+            
+            let html = '';
+            yellowDb.forEach((k, idx) => { html += `<span class="db-tag db-tag-yellow">${escapeHTML(k)} <b style="color:red; cursor:pointer; margin-left:6px;" onclick="deleteDatabaseKeyword('yellow', ${idx})">&times;</b></span>`; });
+            orangeDb.forEach((k, idx) => { html += `<span class="db-tag db-tag-orange">${escapeHTML(k)} <b style="color:red; cursor:pointer; margin-left:6px;" onclick="deleteDatabaseKeyword('orange', ${idx})">&times;</b></span>`; });
+            holder.innerHTML = html;
+        }
+
+        function deleteDatabaseKeyword(color, index) {
+            let storageKey = color === 'orange' ? 'frst_orange_db' : 'frst_yellow_db';
+            let db = safeGetStorage(storageKey, []);
+            db.splice(index, 1);
+            safeSetStorage(storageKey, db);
+            renderDatabaseKeywords();
+            if(currentLogLines.length > 0) renderLog();
+        }
+
+        function saveHelperEntry() {
+            const sectionTitle = document.getElementById('helper-input-section').value.trim() || 'General Snippet';
+            const textValue = document.getElementById('helper-input-text').value.trim();
+            if (!textValue) return;
+
+            let items = safeGetStorage('frst_helper_items', []);
+            items.push({ id: Date.now(), section: sectionTitle, content: textValue });
+            safeSetStorage('frst_helper_items', items);
+            
+            document.getElementById('helper-input-section').value = '';
+            document.getElementById('helper-input-text').value = '';
+            loadHelperEntries();
+        }
+
+        function loadHelperEntries() {
+            const displayBox = document.getElementById('helper-saved-list');
+            let items = safeGetStorage('frst_helper_items', []);
+            if(items.length === 0) {
+                displayBox.innerHTML = '<p style="color:#666; font-style:italic;">No saved snippets.</p>';
+                return;
+            }
+            let html = '';
+            items.forEach(item => {
+                html += `<div class="helper-section"><div class="helper-title"><span>📂 ${escapeHTML(item.section)}</span><span class="delete-btn" onclick="deleteHelperEntry(${item.id})">❌ Delete</span></div><div class="helper-body" onclick="document.execCommand('copy')">${escapeHTML(item.content)}</div></div>`;
+            });
+            displayBox.innerHTML = html;
+        }
+
+        function deleteHelperEntry(id) {
+            let items = safeGetStorage('frst_helper_items', []);
+            items = items.filter(item => item.id !== id);
+            safeSetStorage('frst_helper_items', items);
+            loadHelperEntries();
         }
 
         function escapeHTML(str) {
