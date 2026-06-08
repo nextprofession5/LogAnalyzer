@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FRST Log Analyzer Pro</title>
+    <title>FRST Log Analyzer Workspace</title>
     <style>
         :root {
             --bg-color: #1e1e1e;
@@ -130,8 +130,7 @@
             border-radius: 4px;
             font-size: 11px; 
             line-height: 1.4;
-            user-select: none; 
-            -webkit-user-select: none;
+            user-select: text;
         }
 
         #log-display div { 
@@ -145,7 +144,6 @@
             background-color: rgba(255,255,255,0.05);
         }
 
-        /* Flagging & Tracking Styles */
         .hl-attention { color: var(--attention-color) !important; font-weight: bold; }
         .hl-nofile { color: var(--nofile-color) !important; font-weight: bold; }
         .hl-yellow { color: var(--yellow-flag) !important; font-weight: bold; background-color: rgba(255, 255, 0, 0.08); }
@@ -180,7 +178,7 @@
             padding: 20px;
             border-radius: 8px;
             width: 95%;
-            max-width: 450px;
+            max-width: 600px;
             max-height: 85vh;
             overflow-y: auto;
             border: 1px solid var(--border-color);
@@ -220,6 +218,7 @@
             white-space: pre;
             overflow-x: auto;
             font-size: 11px;
+            font-family: monospace;
         }
 
         .helper-section {
@@ -251,7 +250,6 @@
         .db-tag {
             display: inline-block;
             background: #444;
-            color: var(--yellow-flag);
             padding: 4px 8px;
             border-radius: 4px;
             margin: 4px;
@@ -273,14 +271,6 @@
             z-index: 300;
             font-size: 13px;
             box-shadow: 0 4px 6px rgba(0,0,0,0.5);
-        }
-
-        .parse-btn {
-            background-color: #9b59b6;
-            width: auto;
-            padding: 6px 14px;
-            margin-top: 0;
-            font-size: 12px;
         }
     </style>
 </head>
@@ -308,7 +298,6 @@
         </div>
         <div class="utility-row">
             <input type="text" id="live-filter" placeholder="🔍 Filter log view..." oninput="filterLogView()">
-            <button class="parse-btn" id="master-parse-trigger" onclick="runAutoParse()">⚡ Parse via Python</button>
         </div>
     </div>
 
@@ -320,29 +309,12 @@
         <button style="background-color: #2b8a3e;" onclick="openHelperModal()">📋 Helper GUI</button>
     </div>
 
-    <div id="auto-parse-modal" class="modal">
-        <div class="modal-content">
-            <span class="close-btn" onclick="closeModal('auto-parse-modal')">&times;</span>
-            <h2>⚡ Python Heuristic Analysis</h2>
-            
-            <h3 style="color: var(--attention-color); margin-bottom: 5px; font-size: 14px;">⚠️ System Flags</h3>
-            <p style="font-size: 10px; margin-top: 0; color: #888;">All lines matching raw 'ATTENTION' indicators.</p>
-            <textarea id="parse-standard-area" class="output-box" style="height: 120px;"></textarea>
-            <button id="copy-standard-btn" class="btn-block" onclick="copyResults('parse-standard-area', 'copy-standard-btn')" style="margin-top: 5px;">Copy System Flags</button>
-
-            <h3 style="color: var(--orange-flag); margin-bottom: 5px; margin-top: 20px; font-size: 14px;">🤖 Expert Matcher (Suspects Only)</h3>
-            <p style="font-size: 10px; margin-top: 0; color: #888;">Advanced Python Regex extraction. (Excludes 'No File' and 'ATTENTION')</p>
-            <textarea id="parse-sus-area" class="output-box" style="height: 120px;"></textarea>
-            <button id="copy-sus-btn" class="btn-block" onclick="copyResults('parse-sus-area', 'copy-sus-btn')" style="margin-top: 5px; background-color: var(--orange-flag);">Copy Suspects</button>
-        </div>
-    </div>
-
     <div id="tools-modal" class="modal">
         <div class="modal-content">
             <span class="close-btn" onclick="closeModal('tools-modal')">&times;</span>
             <h2>Tools Extraction</h2>
-            <p>Type exactly <b>No File</b> or <b>ATTENTION</b> to grab matching lines.</p>
-            <input type="text" id="tool-instruction" placeholder="No File / ATTENTION">
+            <p>Type keywords to pull explicit telemetry matches manually.</p>
+            <input type="text" id="tool-instruction" placeholder="e.g., ATTENTION or Task:">
             <button class="btn-block" onclick="processInstruction()">Extract Lines</button>
         </div>
     </div>
@@ -359,7 +331,7 @@
     <div id="fixlist-modal" class="modal">
         <div class="modal-content">
             <span class="close-btn" onclick="closeModal('fixlist-modal')">&times;</span>
-            <h2>Fixlist</h2>
+            <h2>Fixlist Workspace</h2>
             <textarea id="fixlist-area" class="output-box" style="height: 240px;">Start::
 SystemRestore: On
 CreateRestorePoint:
@@ -408,7 +380,7 @@ End::</textarea>
                 <input type="text" id="helper-input-section" placeholder="e.g., Extra Commands">
                 <label><b>Saved Content:</b></label>
                 <textarea id="helper-input-text" class="form-control" style="height:70px;" placeholder="Paste text here..."></textarea>
-                <button class="btn-block" onclick="saveHelperEntry()">Save & Permanent Add</button>
+                <button class="btn-block" onclick="saveHelperEntry()">Save Snippet Entry</button>
             </div>
 
             <h3>Your Saved Sections</h3>
@@ -451,15 +423,6 @@ End::</textarea>
             renderLog();
         }
 
-        function matchDatabaseKeyword(line, keyword) {
-            if (keyword.startsWith('/') && keyword.endsWith('/') && keyword.length > 2) {
-                try {
-                    return new RegExp(keyword.slice(1, -1), 'i').test(line);
-                } catch (e) { return false; }
-            }
-            return line.toLowerCase().includes(keyword.toLowerCase());
-        }
-
         function renderLog() {
             const rawText = document.getElementById('log-input').value;
             if (!rawText) return;
@@ -478,6 +441,9 @@ End::</textarea>
 
             const fragment = document.createDocumentFragment();
 
+            let yellowDb = safeGetStorage('frst_yellow_db', []);
+            let orangeDb = safeGetStorage('frst_orange_db', []);
+
             currentLogLines.forEach((line, index) => {
                 const lineEl = document.createElement('div');
                 lineEl.id = `log-L${index}`;
@@ -495,9 +461,12 @@ End::</textarea>
                 }
 
                 let safeLine = line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                let lowerLine = line.toLowerCase();
                 
                 if (line.includes('ATTENTION')) lineEl.classList.add('hl-attention');
                 else if (line.includes('No File')) lineEl.classList.add('hl-nofile');
+                else if (orangeDb.some(term => lowerLine.includes(term.toLowerCase()))) lineEl.classList.add('hl-orange');
+                else if (yellowDb.some(term => lowerLine.includes(term.toLowerCase()))) lineEl.classList.add('hl-yellow');
 
                 lineEl.innerHTML = safeLine || '&nbsp;';
                 fragment.appendChild(lineEl);
@@ -511,38 +480,6 @@ End::</textarea>
             document.getElementById('utility-bar').style.display = 'flex';
         }
 
-        // --- WEBHOOK COMM LINK TO PYTHON API --- //
-        function runAutoParse() {
-            const logData = document.getElementById('log-input').value;
-            if (!logData) return alert("Please load a log file first.");
-
-            const parseBtn = document.getElementById('master-parse-trigger');
-            parseBtn.innerText = "⏳ Processing...";
-            parseBtn.disabled = true;
-
-            const pythonServerUrl = "https://your-private-api.render.com/parse";
-
-            fetch(pythonServerUrl, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ log: logData })
-            })
-            .then(response => response.json())
-            .then(data => {
-                document.getElementById('parse-standard-area').value = data.system_flags;
-                document.getElementById('parse-sus-area').value = data.expert_suspects;
-                openModal('auto-parse-modal');
-            })
-            .catch(err => {
-                console.error("Connection failed:", err);
-                alert("Could not reach Python API server. Verify link architecture.");
-            })
-            .finally(() => {
-                parseBtn.innerText = "⚡ Parse via Python";
-                parseBtn.disabled = false;
-            });
-        }
-
         function runManualSearchQuery() {
             const inputEl = document.getElementById('lookup-filename-input');
             const targetEntry = inputEl.value.trim();
@@ -552,45 +489,23 @@ End::</textarea>
             window.open(targetUrl, '_blank');
         }
 
-        // --- MOBILE HOLD-TO-COPY LOGIC --- //
-        let pressTimer;
-        let pressTargetIdx = -1;
+        // --- SINGLE-CLICK TO COPY EVENT ---
         const logDisplay = document.getElementById('log-display');
-
-        function startLongPress(e) {
+        logDisplay.addEventListener('click', function(e) {
             let targetDiv = e.target.closest('div[id^="log-L"]');
             if (!targetDiv) return;
             
-            pressTargetIdx = parseInt(targetDiv.id.replace('log-L', ''));
-            pressTimer = setTimeout(() => {
-                copyLineToClipboard(pressTargetIdx);
-            }, 500); 
-        }
-
-        function cancelLongPress() {
-            clearTimeout(pressTimer);
-            pressTargetIdx = -1;
-        }
-
-        logDisplay.addEventListener('touchstart', startLongPress, {passive: true});
-        logDisplay.addEventListener('touchend', cancelLongPress);
-        logDisplay.addEventListener('touchmove', cancelLongPress, {passive: true}); 
-        logDisplay.addEventListener('mousedown', startLongPress);
-        logDisplay.addEventListener('mouseup', cancelLongPress);
-        logDisplay.addEventListener('mouseleave', cancelLongPress);
-
-        function copyLineToClipboard(index) {
-            cancelLongPress(); 
-            if(index < 0 || index >= currentLogLines.length) return;
-            
-            let rawText = currentLogLines[index];
-            navigator.clipboard.writeText(rawText).then(() => {
-                document.getElementById('log-L' + index).classList.add('hl-copied');
-                const toast = document.getElementById('toast');
-                toast.style.display = 'block';
-                setTimeout(() => { toast.style.display = 'none'; }, 1000);
-            });
-        }
+            let idx = parseInt(targetDiv.id.replace('log-L', ''));
+            if(idx >= 0 && idx < currentLogLines.length) {
+                let rawText = currentLogLines[idx];
+                navigator.clipboard.writeText(rawText).then(() => {
+                    targetDiv.classList.add('hl-copied');
+                    const toast = document.getElementById('toast');
+                    toast.style.display = 'block';
+                    setTimeout(() => { toast.style.display = 'none'; }, 1000);
+                });
+            }
+        });
 
         function jumpToSection() {
             const targetId = document.getElementById('section-jumper').value;
