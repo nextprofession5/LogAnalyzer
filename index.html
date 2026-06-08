@@ -440,7 +440,6 @@ End::</textarea>
         const frstSections = ["processes", "registry", "scheduled tasks", "internet", "services", "drivers", "netsvcs", "one month (created)", "one month (modified)", "files in root", "sigcheck"];
         const additionSections = ["accounts", "security center", "installed programs", "packages", "custom clsid", "codecs", "shortcuts & wmi", "loaded modules", "alternate data streams", "safe mode", "association", "internet explorer", "hosts content", "network", "other areas", "msconfig", "firewallrules", "restore points", "faulty device manager", "event log errors", "memory info", "drives", "mbr & partition table"];
 
-        // Pattern Matrix Storage Definition Maps
         const Patterns = {
             MD5_HASH: /^[a-fA-F0-9]{32}$/,
             SHA256_HASH: /^[a-fA-F0-9]{64}$/,
@@ -467,6 +466,7 @@ End::</textarea>
         };
 
         function getBaseAndExt(fullPath) {
+            if (!fullPath) return { base: "", ext: "", name: "" };
             let normalized = fullPath.replace(/\\/g, '/');
             if (normalized.endsWith('/')) normalized = normalized.slice(0, -1);
             let parts = normalized.split('/');
@@ -477,7 +477,6 @@ End::</textarea>
             return { base, ext, name };
         }
 
-        // Structural Classes Data Schemas Objects 
         class Task {
             constructor(guid, name, path, commandLine, author) {
                 this.guid = guid; this.name = name; this.path = path; this.commandLine = commandLine; this.author = author;
@@ -494,19 +493,12 @@ End::</textarea>
                 this.key = key; this.value = value; this.data = data; this.type = type;
             }
         }
-        class FirewallRule {
-            constructor(guid, name, action, direction, localPort, remotePort, protocol, filePath) {
-                this.guid = guid; this.name = name; this.action = action; this.direction = direction;
-                this.localPort = localPort; this.remotePort = remotePort; this.protocol = protocol; this.filePath = filePath;
-            }
-        }
         class ThreatFinding {
             constructor(item, score, reasons, type, line) {
                 this.item = item; this.score = score; this.reasons = reasons; this.type = type; this.line = line;
             }
         }
 
-        // Dynamic Heuristic Weighted Verification Blocks
         class ThreatScorer {
             static scoreFile(fileEntry, correlations) {
                 let score = 0; const reasons = [];
@@ -529,14 +521,14 @@ End::</textarea>
 
                 if (extension === '.exe' || extension === '.scr') {
                     if (!(filePath.includes('Program Files') || filePath.includes('Windows'))) {
-                        score += 15; reasons.push('EXE outside standard system folders');
+                        score += 15; reasons.push('EXE outside standard folders');
                     }
                 }
-                if (Patterns.SUSPECT_EXT.test(extension)) { score += 15; reasons.push('Suspicious extension drop'); }
-                if (fileEntry.signature && fileEntry.signature.includes('not signed')) { score += 5; reasons.push('Unsigned signature component'); }
+                if (Patterns.SUSPECT_EXT.test(extension)) { score += 15; reasons.push('Suspicious script extension'); }
+                if (fileEntry.signature && fileEntry.signature.includes('not signed')) { score += 5; reasons.push('Unsigned component'); }
 
                 if (correlations.hasTask) { score += 30; reasons.push(`Associated with persistent task hook`); }
-                if (correlations.hasRunEntry) { score += 25; reasons.push('Associated with auto-run registry configurations'); }
+                if (correlations.hasRunEntry) { score += 25; reasons.push('Associated with auto-run configuration'); }
 
                 return { score, reasons };
             }
@@ -547,10 +539,10 @@ End::</textarea>
 
                 if (Patterns.GEOGRAPHIC_TASK.test(name)) { score += 60; reasons.push('Suspicious naming fingerprint'); }
                 if (Patterns.LOLBIN_POWERSHELL.test(commandLine) || Patterns.ENC_POWERSHELL.test(commandLine)) {
-                    score += 55; reasons.push('PowerShell arguments trace matching evasion signatures');
+                    score += 55; reasons.push('PowerShell manipulation arguments');
                 }
-                if (taskPath && Patterns.TEMP_LOC.test(taskPath)) { score += 30; reasons.push('Task maps script to volatile Temp memory path'); }
-                if (taskPath && Patterns.ROAMING_LOC.test(taskPath)) { score += 35; reasons.push('Task targets script drop inside application profile space'); }
+                if (taskPath && Patterns.TEMP_LOC.test(taskPath)) { score += 30; reasons.push('Task maps to Temp path'); }
+                if (taskPath && Patterns.ROAMING_LOC.test(taskPath)) { score += 35; reasons.push('Task maps to Roaming profile'); }
 
                 return { score, reasons };
             }
@@ -559,33 +551,31 @@ End::</textarea>
                 let score = 0; const reasons = [];
                 const { key, value, data } = regEntry;
 
-                if (Patterns.DEFENDER_DISABLE.test(key + value)) { score += 90; reasons.push('Defender disabled via registry mapping modification'); }
+                if (Patterns.DEFENDER_DISABLE.test(key + value)) { score += 90; reasons.push('Defender policy disabled modification'); }
                 if ((value === 'shell' || value === 'userinit') && data && !data.includes('explorer.exe')) {
-                    score += 80; reasons.push('Winlogon shell environment hook hijack configuration');
+                    score += 80; reasons.push('Winlogon shell environment hijack');
                 }
                 return { score, reasons };
             }
         }
 
-        // Resilient Client Side Analyzer Engine Object Controller
         class FrstParser {
             constructor() {
-                this.scan = { tasks: [], filesCreated: [], registryRun: [], registryPolicies: [], firewallRules: [] };
+                this.scan = { tasks: [], filesCreated: [], registryRun: [], registryPolicies: [] };
                 this.findings = [];
             }
 
             parseFrstContent(content) {
+                if (!content) return this;
                 const lines = content.split(/\r?\n/);
-                let currentSection = "Global context snapshot environment logs runtime stream";
 
                 for (let i = 0; i < lines.length; i++) {
                     const line = lines[i];
+                    if (!line) continue;
                     const cleanLine = line.trim();
                     const lowerLine = cleanLine.toLowerCase();
-                    if (!cleanLine) continue;
 
                     if (cleanLine.startsWith('====================') && cleanLine.endsWith('====================')) {
-                        currentSection = cleanLine.replace(/=/g, '').trim();
                         continue;
                     }
 
@@ -593,9 +583,8 @@ End::</textarea>
                         continue;
                     }
 
-                    // Direct tripwires handlers mapping logic structures
                     if (cleanLine.includes("<==== ATTENTION")) {
-                        this.findings.push(new ThreatFinding(cleanLine, 85, ['Explicit log warning alert trace flagged'], 'attention', cleanLine));
+                        this.findings.push(new ThreatFinding(cleanLine, 85, ['Explicit log warning alert flagged'], 'attention', cleanLine));
                     }
 
                     if (cleanLine.startsWith('Task:')) {
@@ -617,44 +606,46 @@ End::</textarea>
                 const match = line.match(/Task:\s+\{([^}]+)\}\s+-\s+(.+?)\s*=>?\s*(.*)/i);
                 if (match) {
                     const name = match[2].includes('\\') ? match[2].split('\\').pop() : match[2];
-                    const taskObj = new Task(match[1], name, match[3].trim() || match[2].trim(), line, '');
-                    this.scan.tasks.push(taskObj);
+                    this.scan.tasks.push(new Task(match[1], name, match[3].trim() || match[2].trim(), line, ''));
                 }
             }
 
             parseRegistryLine(line) {
-                const runMatch = line.match(/^(HKLM|HKCU|HKU\S+)\\...\\Winlogon/i) || line.match(/^(HKLM|HKCU|HKU\S+)\\...\\Run/i);
-                if (runMatch) {
-                    let parts = line.split(':');
-                    let key = parts[0] || "";
-                    let remaining = parts.slice(1).join(':');
-                    let dataMatch = remaining.match(/\[(.*?)\]\s*=>\s*(.*)/) || [null, "", remaining];
-                    
-                    const regObj = new RegistryEntry(key, dataMatch[1], dataMatch[2], 'Run');
-                    this.scan.registryRun.push(regObj);
-                    
-                    const { score, reasons } = ThreatScorer.scoreRegistry(regObj);
-                    if (score > 0) {
-                        this.findings.push(new ThreatFinding(regObj, score, reasons, 'registry', line));
+                try {
+                    const runMatch = line.match(/^(HKLM|HKCU|HKU\S+)\\...\\Winlogon/i) || line.match(/^(HKLM|HKCU|HKU\S+)\\...\\Run/i);
+                    if (runMatch) {
+                        let parts = line.split(':');
+                        let key = parts[0] || "";
+                        let remaining = parts.slice(1).join(':');
+                        let dataMatch = remaining.match(/\[(.*?)\]\s*=>\s*(.*)/) || [null, "", remaining];
+                        
+                        const regObj = new RegistryEntry(key, dataMatch[1], dataMatch[2], 'Run');
+                        this.scan.registryRun.push(regObj);
+                        
+                        const { score, reasons } = ThreatScorer.scoreRegistry(regObj);
+                        if (score > 0) {
+                            this.findings.push(new ThreatFinding(regObj, score, reasons, 'registry', line));
+                        }
                     }
-                }
+                } catch(e) {}
             }
 
-            // Bulletproof file extraction matching split routines logic mapping
             parseFileLine(line) {
-                const fileMatch = line.match(/^(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2})\s+-\s+(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2})\s+-\s+(\d+)\s+(.*)$/);
-                if (fileMatch) {
-                    let textBlock = fileMatch[4];
-                    let pathMatch = textBlock.match(/([a-zA-Z]:\\.*)$/);
-                    if (pathMatch) {
-                        let fullPath = pathMatch[1].trim();
-                        let sigInfo = textBlock.replace(fullPath, "").trim();
-                        let pathData = getBaseAndExt(fullPath);
-                        
-                        const fileEntry = new FileEntry(fullPath, pathData.name, pathData.ext, parseInt(fileMatch[3], 10), fileMatch[1], fileMatch[2], sigInfo, line.includes('____D'));
-                        this.scan.filesCreated.push(fileEntry);
+                try {
+                    const fileMatch = line.match(/^(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2})\s+-\s+(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2})\s+-\s+(\d+)\s+(.*)$/);
+                    if (fileMatch) {
+                        let textBlock = fileMatch[4];
+                        let pathMatch = textBlock.match(/([a-zA-Z]:\\.*)$/);
+                        if (pathMatch) {
+                            let fullPath = pathMatch[1].trim();
+                            let sigInfo = textBlock.replace(fullPath, "").trim();
+                            let pathData = getBaseAndExt(fullPath);
+                            
+                            const fileEntry = new FileEntry(fullPath, pathData.name, pathData.ext, parseInt(fileMatch[3], 10), fileMatch[1], fileMatch[2], sigInfo, line.includes('____D'));
+                            this.scan.filesCreated.push(fileEntry);
+                        }
                     }
-                }
+                } catch(e) {}
             }
 
             runLooseLineHeuristics(line) {
@@ -663,10 +654,10 @@ End::</textarea>
                 let score = 0;
 
                 if (Patterns.SUSPECT_EXT.test(lower) && (lower.includes('appdata') || lower.includes('temp') || lower.includes('public'))) {
-                    score += 55; reasons.push('Script execution directive drop matched inside storage paths');
+                    score += 55; reasons.push('Unmanaged script vector drop matched inside application parameters');
                 }
                 if (Patterns.DOUBLE_EXT.test(lower)) {
-                    score += 70; reasons.push('Double extension masquerade payload pattern matched');
+                    score += 70; reasons.push('Double extension payload configuration matched');
                 }
 
                 if (score >= 35) {
@@ -723,7 +714,6 @@ End::</textarea>
             }
         }
 
-        // Unified workspace controller loops scripts
         async function handleFileUpload() {
             const fileInput = document.getElementById('file-picker');
             const fileNameDisplay = document.getElementById('file-name');
@@ -795,7 +785,7 @@ End::</textarea>
 
         function runAutomatedThreatParser() {
             const rawContent = document.getElementById('log-input').value;
-            if (!rawContent) return alert("No log data loaded inside container scope memory matrices mapping.");
+            if (!rawContent) return alert("No log data loaded.");
 
             const engine = new FrstParser();
             engine.parseFrstContent(rawContent);
