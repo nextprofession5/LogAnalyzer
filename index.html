@@ -130,8 +130,7 @@
             border-radius: 4px;
             font-size: 11px; 
             line-height: 1.4;
-            user-select: none; 
-            -webkit-user-select: none;
+            user-select: text;
         }
 
         #log-display div { 
@@ -145,7 +144,6 @@
             background-color: rgba(255,255,255,0.05);
         }
 
-        /* Flagging & Tracking Styles */
         .hl-attention { color: var(--attention-color) !important; font-weight: bold; }
         .hl-nofile { color: var(--nofile-color) !important; font-weight: bold; }
         .hl-yellow { color: var(--yellow-flag) !important; font-weight: bold; background-color: rgba(255, 255, 0, 0.08); }
@@ -251,7 +249,6 @@
         .db-tag {
             display: inline-block;
             background: #444;
-            color: var(--yellow-flag);
             padding: 4px 8px;
             border-radius: 4px;
             margin: 4px;
@@ -308,7 +305,7 @@
         </div>
         <div class="utility-row">
             <input type="text" id="live-filter" placeholder="🔍 Filter log view..." oninput="filterLogView()">
-            <button class="parse-btn" onclick="runAutoParse()">⚡ Parse</button>
+            <button class="parse-btn" id="master-parse-trigger" onclick="runAutoParse()">⚡ Parse via Python</button>
         </div>
     </div>
 
@@ -323,15 +320,15 @@
     <div id="auto-parse-modal" class="modal">
         <div class="modal-content">
             <span class="close-btn" onclick="closeModal('auto-parse-modal')">&times;</span>
-            <h2>⚡ Auto-Parse Results</h2>
+            <h2>⚡ Python Forensic Triaging</h2>
             
             <h3 style="color: var(--attention-color); margin-bottom: 5px; font-size: 14px;">⚠️ System Flags</h3>
-            <p style="font-size: 10px; margin-top: 0; color: #888;">Catches ALL lines containing "ATTENTION"</p>
+            <p style="font-size: 10px; margin-top: 0; color: #888;">All lines containing raw 'ATTENTION' tags.</p>
             <textarea id="parse-standard-area" class="output-box" style="height: 120px;"></textarea>
             <button id="copy-standard-btn" class="btn-block" onclick="copyResults('parse-standard-area', 'copy-standard-btn')" style="margin-top: 5px;">Copy System Flags</button>
 
-            <h3 style="color: var(--orange-flag); margin-bottom: 5px; margin-top: 20px; font-size: 14px;">🤖 Expert Matcher (Suspects Only)</h3>
-            <p style="font-size: 10px; margin-top: 0; color: #888;">Learned behavior patterns. Excludes 'No File' or 'ATTENTION' items.</p>
+            <h3 style="color: var(--orange-flag); margin-bottom: 5px; margin-top: 20px; font-size: 14px;">🤖 Expert Matcher Anomaly Matrix</h3>
+            <p style="font-size: 10px; margin-top: 0; color: #888;">Advanced regex detection engine. (Excludes 'No File' and 'ATTENTION')</p>
             <textarea id="parse-sus-area" class="output-box" style="height: 120px;"></textarea>
             <button id="copy-sus-btn" class="btn-block" onclick="copyResults('parse-sus-area', 'copy-sus-btn')" style="margin-top: 5px; background-color: var(--orange-flag);">Copy Suspects</button>
         </div>
@@ -359,7 +356,7 @@
     <div id="fixlist-modal" class="modal">
         <div class="modal-content">
             <span class="close-btn" onclick="closeModal('fixlist-modal')">&times;</span>
-            <h2>Fixlist</h2>
+            <h2>Fixlist Workspace</h2>
             <textarea id="fixlist-area" class="output-box" style="height: 240px;">Start::
 SystemRestore: On
 CreateRestorePoint:
@@ -382,6 +379,13 @@ End::</textarea>
         <div class="modal-content">
             <span class="close-btn" onclick="closeModal('helper-modal')">&times;</span>
             
+            <h2>Process Manual Query</h2>
+            <div style="border: 1px dashed var(--primary-color); padding: 10px; margin-bottom: 20px; border-radius:4px;">
+                <label><b>Search Entry:</b></label>
+                <input type="text" id="lookup-filename-input" placeholder="e.g., badfile.sys or svchost.exe">
+                <button class="btn-block" style="background-color: var(--primary-color);" onclick="runManualSearchQuery()">Search Web Entry</button>
+            </div>
+
             <h2>Flagging Databases</h2>
             <div style="border: 1px dashed #666; padding: 10px; margin-bottom: 20px; border-radius:4px;">
                 <label><b>Enter Path, Keyword, or Regex:</b></label>
@@ -401,7 +405,7 @@ End::</textarea>
                 <input type="text" id="helper-input-section" placeholder="e.g., Extra Commands">
                 <label><b>Saved Content:</b></label>
                 <textarea id="helper-input-text" class="form-control" style="height:70px;" placeholder="Paste text here..."></textarea>
-                <button class="btn-block" onclick="saveHelperEntry()">Save & Permanent Add</button>
+                <button class="btn-block" onclick="saveHelperEntry()">Save Snippet Entry</button>
             </div>
 
             <h3>Your Saved Sections</h3>
@@ -444,15 +448,6 @@ End::</textarea>
             renderLog();
         }
 
-        function matchDatabaseKeyword(line, keyword) {
-            if (keyword.startsWith('/') && keyword.endsWith('/') && keyword.length > 2) {
-                try {
-                    return new RegExp(keyword.slice(1, -1), 'i').test(line);
-                } catch (e) { return false; }
-            }
-            return line.toLowerCase().includes(keyword.toLowerCase());
-        }
-
         function renderLog() {
             const rawText = document.getElementById('log-input').value;
             if (!rawText) return;
@@ -469,8 +464,6 @@ End::</textarea>
             const additionGroup = document.createElement('optgroup');
             additionGroup.label = "─── Addition.txt Sections ───";
 
-            const yellowDB = safeGetStorage('frst_yellow_db', []);
-            const orangeDB = safeGetStorage('frst_orange_db', []);
             const fragment = document.createDocumentFragment();
 
             currentLogLines.forEach((line, index) => {
@@ -491,12 +484,7 @@ End::</textarea>
 
                 let safeLine = line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
                 
-                let matchesOrange = orangeDB.some(keyword => matchDatabaseKeyword(line, keyword));
-                let matchesYellow = yellowDB.some(keyword => matchDatabaseKeyword(line, keyword));
-
-                if (matchesOrange && line.trim() !== '') lineEl.classList.add('hl-orange');
-                else if (matchesYellow && line.trim() !== '') lineEl.classList.add('hl-yellow');
-                else if (line.includes('ATTENTION')) lineEl.classList.add('hl-attention');
+                if (line.includes('ATTENTION')) lineEl.classList.add('hl-attention');
                 else if (line.includes('No File')) lineEl.classList.add('hl-nofile');
 
                 lineEl.innerHTML = safeLine || '&nbsp;';
@@ -511,118 +499,65 @@ End::</textarea>
             document.getElementById('utility-bar').style.display = 'flex';
         }
 
-        // --- CORE EXPERT PARSING PATTERNS --- //
+        // --- PIPED WEBHOOK COMM LINK TO PRIVATE NATIVE PYTHON INSTANCE --- //
         function runAutoParse() {
-            if (currentLogLines.length === 0) {
-                alert("Please load a log file first.");
-                return;
-            }
+            const logData = document.getElementById('log-input').value;
+            if (!logData) return alert("Please load a log file first.");
 
-            let attentionFlags = [];
-            let expertSuspects = [];
+            const parseBtn = document.getElementById('master-parse-trigger');
+            parseBtn.innerText = "⏳ Processing...";
+            parseBtn.disabled = true;
 
-            currentLogLines.forEach(line => {
-                if (line.trim() === '') return;
+            // Connected directly to your background Python pipeline engine
+            const pythonServerUrl = "http://127.0.0.1:5000/parse";
 
-                // 1. System Flags box captures ALL lines containing "ATTENTION"
-                if (line.includes('ATTENTION')) {
-                    attentionFlags.push(line);
-                }
-
-                // 2. Suspects box skips any line containing "No File" or "ATTENTION"
-                if (!line.includes('ATTENTION') && !line.includes('No File') && matchExpertHeuristics(line)) {
-                    expertSuspects.push(line);
-                }
+            fetch(pythonServerUrl, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ log: logData })
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('parse-standard-area').value = data.system_flags;
+                document.getElementById('parse-sus-area').value = data.expert_suspects;
+                openModal('auto-parse-modal');
+            })
+            .catch(err => {
+                console.error("Local runtime network failure:", err);
+                alert("Could not reach background execution thread. Verify your Python script terminal window is active and running.");
+            })
+            .finally(() => {
+                parseBtn.innerText = "⚡ Parse via Python";
+                parseBtn.disabled = false;
             });
-
-            document.getElementById('parse-standard-area').value = attentionFlags.join('\n');
-            document.getElementById('parse-sus-area').value = expertSuspects.join('\n');
-            
-            document.getElementById('copy-standard-btn').innerText = 'Copy System Flags';
-            document.getElementById('copy-sus-btn').innerText = 'Copy Suspects';
-            
-            openModal('auto-parse-modal');
         }
 
-        // Learned pattern metrics matched to expert triage rules
-        function matchExpertHeuristics(line) {
-            const lowerLine = line.toLowerCase();
+        function runManualSearchQuery() {
+            const inputEl = document.getElementById('lookup-filename-input');
+            const targetEntry = inputEl.value.trim();
+            if(!targetEntry) return;
 
-            // Ignore validated default application environments to protect layout spaces
-            const safeWhitelist = ['microsoft corporation', 'microsoft windows', 'nvidia corporation', 'realtek', 'valve corporation', 'epic games', 'steamapps', 'tiktok live studio', 'overwolf'];
-            if (safeWhitelist.some(item => lowerLine.includes(item))) {
-                return false;
-            }
-
-            // Target 1: Headless automation runtime wrappers or script bypass commands
-            if (lowerLine.includes('conhost.exe --headless') || 
-                lowerLine.match(/powershell\.exe\s+-(nop|nopr|executionpolicy|ep|w\s+hidden)/i)) {
-                return true;
-            }
-
-            // Target 2: Local User startup menu link hooks (.lnk artifacts)
-            if (lowerLine.includes('\\start menu\\programs\\startup\\') && lowerLine.includes('.lnk')) {
-                return true;
-            }
-
-            // Target 3: Alternate Data Streams hidden system property verification bypasses
-            if (lowerLine.startsWith('alternatedatastreams:') || lowerLine.includes(':versioncache')) {
-                return true;
-            }
-
-            // Target 4: Machine-generated alphanumeric hash directory drops in AppData paths
-            // Automatically maps directory names structured strictly as high-entropy hex codes
-            if (lowerLine.includes('\\appdata\\local\\') && lowerLine.match(/\\[a-f0-9]{16,40}$/i)) {
-                return true;
-            }
-
-            // Target 5: Known generic monitoring modules or info harvesting tools
-            if (lowerLine.includes('infoaggregator') || lowerLine.includes('ctrlserver') || lowerLine.includes('webshield')) {
-                return true;
-            }
-
-            return false;
+            const targetUrl = 'https://www.google.com/search?q=' + encodeURIComponent(targetEntry);
+            window.open(targetUrl, '_blank');
         }
 
-        // --- MOBILE HOLD-TO-COPY LOGIC --- //
-        let pressTimer;
-        let pressTargetIdx = -1;
+        // --- SEAMLESS SINGLE-CLICK CLICK TO COPY EVENT HANDLING --- //
         const logDisplay = document.getElementById('log-display');
-
-        function startLongPress(e) {
+        logDisplay.addEventListener('click', function(e) {
             let targetDiv = e.target.closest('div[id^="log-L"]');
             if (!targetDiv) return;
             
-            pressTargetIdx = parseInt(targetDiv.id.replace('log-L', ''));
-            pressTimer = setTimeout(() => {
-                copyLineToClipboard(pressTargetIdx);
-            }, 500); 
-        }
-
-        function cancelLongPress() {
-            clearTimeout(pressTimer);
-            pressTargetIdx = -1;
-        }
-
-        logDisplay.addEventListener('touchstart', startLongPress, {passive: true});
-        logDisplay.addEventListener('touchend', cancelLongPress);
-        logDisplay.addEventListener('touchmove', cancelLongPress, {passive: true}); 
-        logDisplay.addEventListener('mousedown', startLongPress);
-        logDisplay.addEventListener('mouseup', cancelLongPress);
-        logDisplay.addEventListener('mouseleave', cancelLongPress);
-
-        function copyLineToClipboard(index) {
-            cancelLongPress(); 
-            if(index < 0 || index >= currentLogLines.length) return;
-            
-            let rawText = currentLogLines[index];
-            navigator.clipboard.writeText(rawText).then(() => {
-                document.getElementById('log-L' + index).classList.add('hl-copied');
-                const toast = document.getElementById('toast');
-                toast.style.display = 'block';
-                setTimeout(() => { toast.style.display = 'none'; }, 1000);
-            });
-        }
+            let idx = parseInt(targetDiv.id.replace('log-L', ''));
+            if(idx >= 0 && idx < currentLogLines.length) {
+                let rawText = currentLogLines[idx];
+                navigator.clipboard.writeText(rawText).then(() => {
+                    targetDiv.classList.add('hl-copied');
+                    const toast = document.getElementById('toast');
+                    toast.style.display = 'block';
+                    setTimeout(() => { toast.style.display = 'none'; }, 1000);
+                });
+            }
+        });
 
         function jumpToSection() {
             const targetId = document.getElementById('section-jumper').value;
