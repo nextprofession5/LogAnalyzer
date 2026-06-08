@@ -3,13 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FRST Log Analyzer Workspace</title>
+    <title>FRST Log Analyzer Workspace Pro</title>
     <style>
         :root {
             --bg-color: #1e1e1e;
             --text-color: #d4d4d4;
             --container-bg: #2d2d2d;
             --primary-color: #007acc;
+            --parse-color: #0056b3;
             --border-color: #444;
             --attention-color: #ff5555;
             --nofile-color: #00ff66;
@@ -178,7 +179,7 @@
             padding: 20px;
             border-radius: 8px;
             width: 95%;
-            max-width: 600px;
+            max-width: 750px;
             max-height: 85vh;
             overflow-y: auto;
             border: 1px solid var(--border-color);
@@ -272,6 +273,28 @@
             font-size: 13px;
             box-shadow: 0 4px 6px rgba(0,0,0,0.5);
         }
+
+        .parse-btn {
+            background-color: var(--parse-color);
+            width: auto;
+            padding: 6px 14px;
+            margin-top: 0;
+            font-size: 11px;
+        }
+
+        table.threat-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+            font-size: 11px;
+        }
+        table.threat-table th, table.threat-table td {
+            border: 1px solid var(--border-color);
+            padding: 6px;
+            text-align: left;
+            vertical-align: top;
+        }
+        table.threat-table th { background: #222; }
     </style>
 </head>
 <body>
@@ -298,6 +321,7 @@
         </div>
         <div class="utility-row">
             <input type="text" id="live-filter" placeholder="🔍 Filter log view..." oninput="filterLogView()">
+            <button class="parse-btn" id="master-parse-trigger" onclick="runAutomatedThreatParser()">⚡ Parse via JavaScript</button>
         </div>
     </div>
 
@@ -307,6 +331,26 @@
         <button onclick="openModal('tools-modal')">🛠️ Tools</button>
         <button style="background-color: #e67e22;" onclick="openModal('fixlist-modal')">📝 View Fixlist</button>
         <button style="background-color: #2b8a3e;" onclick="openHelperModal()">📋 Helper GUI</button>
+    </div>
+
+    <div id="auto-parse-modal" class="modal">
+        <div class="modal-content" style="max-width: 800px;">
+            <span class="close-btn" onclick="closeModal('auto-parse-modal')">&times;</span>
+            <h2>🔎 Found Indicators List</h2>
+            
+            <div style="overflow-y: auto; max-height: 250px; border: 1px solid var(--border-color); margin-bottom: 15px;">
+                <table class="threat-table">
+                    <thead>
+                        <tr><th style="width: 50px;">Score</th><th style="width: 140px;">Identified Vectors</th><th>Context Line Telemetry Record</th></tr>
+                    </thead>
+                    <tbody id="threat-tbody"></tbody>
+                </table>
+            </div>
+
+            <h3 style="color: var(--orange-flag); margin-bottom: 5px; font-size: 13px;">📋 Auto-Compiled Script Workspace</h3>
+            <textarea id="auto-fixlist-area" class="output-box" style="height: 140px;" readonly></textarea>
+            <button id="copy-auto-fix-btn" class="btn-block" onclick="copyResults('auto-fixlist-area', 'copy-auto-fix-btn')" style="background-color: #e67e22;">Copy Script Commands</button>
+        </div>
     </div>
 
     <div id="tools-modal" class="modal">
@@ -395,6 +439,337 @@ End::</textarea>
         const frstSections = ["processes", "registry", "scheduled tasks", "internet", "services", "drivers", "netsvcs", "one month (created)", "one month (modified)", "files in root", "sigcheck"];
         const additionSections = ["accounts", "security center", "installed programs", "packages", "custom clsid", "codecs", "shortcuts & wmi", "loaded modules", "alternate data streams", "safe mode", "association", "internet explorer", "hosts content", "network", "other areas", "msconfig", "firewallrules", "restore points", "faulty device manager", "event log errors", "memory info", "drives", "mbr & partition table"];
 
+        // ----------------------------------------------------------------------
+        // Integrated Pattern Library & Configuration Matrices
+        // ----------------------------------------------------------------------
+        const Patterns = {
+            MD5_HASH: /^[a-fA-F0-9]{32}$/,
+            SHA256_HASH: /^[a-fA-F0-9]{64}$/,
+            GUID: /^\{?[a-fA-F0-9]{8}-?([a-fA-F0-9]{4}-?){3}[a-fA-F0-9]{12}\}?$/i,
+            TYPOSQUAT_SYSTEM: /\b(svchost|explorer|winlogon|services|lsass|spoolsv)\b.*\.exe$/i,
+            DOUBLE_EXT: /\.(exe|scr|pif|com|vbs|ps1)\.(exe|scr|pif|com|vbs|ps1)$/i,
+            GEOGRAPHIC_TASK: /\b(Beacon|Module|Tunisia|Morocco|C2|Command|Control|Trojan|RAT|Bot|Dropper)\b/i,
+            LOLBIN_POWERSHELL: /powershell\.exe.*-EncodedCommand|-WindowStyle Hidden.*-ExecutionPolicy Bypass/i,
+            LOLBIN_PYTHON: /pythonw?\.exe/,
+            LOLBIN_MSHTA: /mshta\.exe/,
+            LOLBIN_CERTUTIL: /certutil\.exe.*-decode/i,
+            LOLBIN_REGSVR32: /regsvr32\.exe.*\/s \/u \/i:http/i,
+            DEFENDER_DISABLE: /DisableAntiSpyware.*Restriction.*ATTENTION|DisableAntiVirus.*Restriction.*ATTENTION/i,
+            RENPY: /\bRenPy\b/i,
+            ENC_POWERSHELL: /-EncodedCommand\s+[A-Za-z0-9+\/=]+/i,
+            SUSPECT_EXT: /\.(vbs|ps1|js|jse|wsf|wsh|hta|scr|pif|jar|py|pyc)$/i,
+            TEMP_LOC: /[\\\/]Temp[\\\/]/i,
+            ROAMING_LOC: /AppData[\\\/]Roaming[\\\/]/i,
+            LOCAL_LOC: /AppData[\\\/]Local[\\\/]/i,
+            PUBLIC_LOC: /[\\\/]Users[\\\/]Public[\\\/]/i,
+            PROGRAMDATA_LOC: /[\\\/]ProgramData[\\\/]/i,
+            SYSTEM32_LOC: /[\\\/]Windows[\\\/]System32[\\\/]/i,
+            SYSWOW64_LOC: /[\\\/]Windows[\\\/]SysWOW64[\\\/]/i,
+        };
+
+        // Helper string utility mapping path name boundaries internally
+        function getBaseAndExt(fullPath) {
+            let normalized = fullPath.replace(/\\/g, '/');
+            if (normalized.endsWith('/')) normalized = normalized.slice(0, -1);
+            let parts = normalized.split('/');
+            let name = parts.pop() || "";
+            let dotIdx = name.lastIndexOf('.');
+            let base = dotIdx !== -1 ? name.substring(0, dotIdx) : name;
+            let ext = dotIdx !== -1 ? name.substring(dotIdx).toLowerCase() : "";
+            return { base, ext, name };
+        }
+
+        // ----------------------------------------------------------------------
+        // Class Structural Models Definition Space
+        // ----------------------------------------------------------------------
+        class Task {
+            constructor(guid, name, path, commandLine, author) {
+                this.guid = guid; this.name = name; this.path = path; this.commandLine = commandLine; this.author = author;
+            }
+        }
+        class FileEntry {
+            constructor(path, name, extension, size, created, modified, signature, isDirectory = false) {
+                this.path = path; this.name = name; this.extension = extension; this.size = size;
+                this.created = created; this.modified = modified; this.signature = signature; this.isDirectory = isDirectory;
+            }
+        }
+        class RegistryEntry {
+            constructor(key, value, data, type) {
+                this.key = key; this.value = value; this.data = data; this.type = type;
+            }
+        }
+        class FirewallRule {
+            constructor(guid, name, action, direction, localPort, remotePort, protocol, filePath) {
+                this.guid = guid; this.name = name; this.action = action; this.direction = direction;
+                this.localPort = localPort; this.remotePort = remotePort; this.protocol = protocol; this.filePath = filePath;
+            }
+        }
+        class ThreatFinding {
+            constructor(item, score, reasons, type, line) {
+                this.item = item; this.score = score; this.reasons = reasons; this.type = type; this.line = line;
+            }
+        }
+
+        // ----------------------------------------------------------------------
+        // Threat Scoring Architecture Engine Logic
+        // ----------------------------------------------------------------------
+        class ThreatScorer {
+            static scoreFile(fileEntry, correlations) {
+                let score = 0; const reasons = [];
+                const { path: filePath, name, extension } = fileEntry;
+                const pathData = getBaseAndExt(name);
+                const baseName = pathData.base;
+
+                if (Patterns.MD5_HASH.test(baseName)) { score += 50; reasons.push('MD5 hash filename'); }
+                else if (Patterns.SHA256_HASH.test(baseName)) { score += 50; reasons.push('SHA256 hash filename'); }
+                if (Patterns.GUID.test(baseName)) { score += 40; reasons.push('GUID filename'); }
+                if (Patterns.TYPOSQUAT_SYSTEM.test(name)) { score += 40; reasons.push('Typosquatting system process name'); }
+                if (Patterns.DOUBLE_EXT.test(name)) { score += 45; reasons.push('Double extension'); }
+
+                if (Patterns.TEMP_LOC.test(filePath)) { score += 25; reasons.push('Executable in Temp folder'); }
+                if (Patterns.ROAMING_LOC.test(filePath) && (extension === '.exe' || Patterns.SUSPECT_EXT.test(extension))) {
+                    score += 35; reasons.push('Executable/script in Roaming folder');
+                }
+                if (Patterns.PUBLIC_LOC.test(filePath)) { score += 30; reasons.push('File in Public folder'); }
+                if (Patterns.PROGRAMDATA_LOC.test(filePath) && extension === '.exe') { score += 20; reasons.push('EXE in ProgramData'); }
+                if ((Patterns.SYSTEM32_LOC.test(filePath) || Patterns.SYSWOW64_LOC.test(filePath)) &&
+                    (Patterns.MD5_HASH.test(baseName) || Patterns.GUID.test(baseName))) {
+                    score += 50; reasons.push('Random name in System32');
+                }
+
+                if (extension === '.exe' || extension === '.scr') {
+                    if (!(filePath.includes('Program Files') || filePath.includes('Windows'))) {
+                        score += 15; reasons.push('EXE outside Program Files/Windows');
+                    }
+                }
+                if (Patterns.SUSPECT_EXT.test(extension)) { score += 10; reasons.push('Suspicious script extension'); }
+                if (fileEntry.signature === 'File not signed' || fileEntry.signature === 'No File') {
+                    score += 5; reasons.push('Unsigned file');
+                }
+
+                if (correlations.hasTask && correlations.taskName) { score += 30; reasons.push(`Associated with scheduled task: ${correlations.taskName}`); }
+                if (correlations.hasRunEntry) { score += 25; reasons.push('Associated with Run/RunOnce registry'); }
+                if (correlations.hasDefenderExclusion) { score += 40; reasons.push('Defender exclusion for this path'); }
+
+                return { score, reasons };
+            }
+
+            static scoreTask(task, correlations) {
+                let score = 0; const reasons = [];
+                const { name, path: taskPath, commandLine, author } = task;
+
+                if (Patterns.GEOGRAPHIC_TASK.test(name)) { score += 60; reasons.push('Geographic/C2 naming pattern'); }
+                if (name.match(/SystemOptimizer|PCRepair|Cleaner|Speedup/i)) { score += 40; reasons.push('Fake system optimizer name'); }
+                if (Patterns.LOLBIN_POWERSHELL.test(commandLine) || Patterns.LOLBIN_MSHTA.test(commandLine) ||
+                    Patterns.LOLBIN_CERTUTIL.test(commandLine) || Patterns.LOLBIN_REGSVR32.test(commandLine)) {
+                    score += 50; reasons.push('LOLBin with suspicious arguments');
+                }
+                if (Patterns.ENC_POWERSHELL.test(commandLine)) { score += 55; reasons.push('Encoded PowerShell command'); }
+                if (taskPath && Patterns.TEMP_LOC.test(taskPath)) { score += 30; reasons.push('Task points to Temp folder'); }
+                if (taskPath && Patterns.ROAMING_LOC.test(taskPath)) { score += 35; reasons.push('Task points to Roaming folder'); }
+                if (author && author.toLowerCase().includes('microsoft') && !taskPath.toLowerCase().includes('windows')) {
+                    score += 50; reasons.push('Fake Microsoft signature');
+                }
+                if (correlations.hasFile && correlations.fileScore > 50) { score += 20; reasons.push('Linked to high-score file'); }
+
+                return { score, reasons };
+            }
+
+            static scoreRegistry(regEntry) {
+                let score = 0; const reasons = [];
+                const { key, value, data } = regEntry;
+
+                if (Patterns.DEFENDER_DISABLE.test(key + value)) { score += 90; reasons.push('Defender disabled via registry'); }
+                if ((key.includes('Policies') || key.includes('DisallowRun')) && data !== undefined) {
+                    score += 60; reasons.push('Restrictive policy set (possible malware)');
+                }
+                if (key.includes('Exclusions\\Paths') || key.includes('Exclusions\\Processes')) {
+                    score += 70; reasons.push('Defender exclusion path/process');
+                }
+                if ((value === 'shell' || value === 'userinit') && data && !data.includes('explorer.exe')) {
+                    score += 80; reasons.push('Winlogon shell/userinit hijack');
+                }
+                return { score, reasons };
+            }
+
+            static scoreFirewallRule(rule) {
+                let score = 0; const reasons = [];
+                if (rule.filePath && rule.filePath.includes('No File')) { score += 10; reasons.push('Orphaned rule (pointing to missing file)'); }
+                if (rule.action === 'Allow' && rule.direction === 'Inbound' && rule.localPort &&
+                    [135, 445, 3389, 4444, 5555].includes(parseInt(rule.localPort))) {
+                    score += 50; reasons.push('Inbound allow rule on sensitive port');
+                }
+                return { score, reasons };
+            }
+        }
+
+        // ----------------------------------------------------------------------
+        // Integrated Core Parser Architecture Loop Class
+        // ----------------------------------------------------------------------
+        class FrstParser {
+            constructor() {
+                this.scan = {
+                    tasks: [], filesCreated: [], filesModified: [], registryRun: [], registryPolicies: [],
+                    services: [], drivers: [], firewallRules: [], alternateDataStreams: []
+                };
+                this.correlations = new Map(); this.findings = [];
+            }
+
+            parseFrstContent(content) {
+                const lines = content.split(/\r?\n/); let currentSection = null;
+                for (let i = 0; i < lines.length; i++) {
+                    const line = lines[i];
+                    if (line.startsWith('====================') && line.endsWith('====================')) {
+                        currentSection = line.trim(); continue;
+                    }
+                    if (!currentSection) continue;
+
+                    if (currentSection.includes('Scheduled Tasks')) this.parseTaskLine(line);
+                    else if (currentSection.includes('Registry (Whitelisted)')) this.parseRegistryLine(line);
+                    else if (currentSection.includes('Services (Whitelisted)')) this.parseServiceLine(line);
+                    else if (currentSection.includes('Drivers (Whitelisted)')) this.parseDriverLine(line);
+                    else if (currentSection.includes('FirewallRules')) this.parseFirewallLine(line);
+                    else if (currentSection.includes('One month (created)')) this.parseFileLine(line, 'created');
+                    else if (currentSection.includes('One month (modified)')) this.parseFileLine(line, 'modified');
+                    else if (currentSection.includes('Alternate Data Streams')) this.parseAdsLine(line);
+                }
+                this.correlate(); this.detectThreats();
+                return this;
+            }
+
+            parseTaskLine(line) {
+                const match = line.match(/Task:\s+\{([^}]+)\}\s+-\s+(.+?)\s*=>?\s*(.*)/i);
+                if (match) {
+                    const name = match[2].includes('\\') ? match[2].split('\\').pop() : match[2];
+                    this.scan.tasks.push(new Task(match[1], name, match[3].trim() || match[2].trim(), '', ''));
+                } else {
+                    const altMatch = line.match(/Task:\s+\{([^}]+)\}\s+-\s+(.+)/);
+                    if (altMatch) {
+                        const name = altMatch[2].includes('\\') ? altMatch[2].split('\\').pop() : altMatch[2];
+                        this.scan.tasks.push(new Task(altMatch[1], name, altMatch[2].trim(), '', ''));
+                    }
+                }
+            }
+
+            parseRegistryLine(line) {
+                const runMatch = line.match(/^(HKLM|HKCU|HKU\S+)\\...\\Run:?\s+\[?([^\]]*)\]?\s*=>?\s*(.*)/i);
+                if (runMatch) {
+                    this.scan.registryRun.push(new RegistryEntry(runMatch[1], runMatch[2].trim(), runMatch[3].trim(), 'Run'));
+                }
+                if (line.includes('Policies') || line.includes('Windows Defender\\Exclusions')) {
+                    this.scan.registryPolicies.push(line.trim());
+                }
+            }
+
+            parseServiceLine(line) {
+                const match = line.match(/^(S\d+)\s+(\S+);\s+"([^"]*)"/);
+                if (match) this.scan.services.push({ name: match[2], path: match[3] });
+            }
+
+            parseDriverLine(line) {
+                const match = line.match(/^(S\d+)\s+(\S+);\s+\\??\\?([^;]+)/);
+                if (match) this.scan.drivers.push({ name: match[2], path: match[3] });
+            }
+
+            parseFirewallLine(line) {
+                const match = line.match(/FirewallRules:\s+\[\{([^}]+)\}\]\s+=>\s+\((\w+)\)\s+(.*?)\s+=>\s+(.*)/i);
+                if (match) {
+                    this.scan.firewallRules.push(new FirewallRule(match[1], '', match[2], '', null, null, null, match[4].trim() === 'No File' ? 'No File' : match[3].trim()));
+                }
+            }
+
+            parseFileLine(line, type) {
+                const match = line.match(/^(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2})\s+-\s+(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2})\s+-\s+(\d+)\s+_____\s+(.*)$/);
+                if (match) {
+                    const pathData = getBaseAndExt(match[6].trim());
+                    const fileEntry = new FileEntry(match[6].trim(), pathData.name, pathData.ext, parseInt(match[5], 10), `${match[1]} ${match[2]}`, `${match[3]} ${match[4]}`, '', false);
+                    if (type === 'created') this.scan.filesCreated.push(fileEntry); else this.scan.filesModified.push(fileEntry);
+                } else {
+                    const folderMatch = line.match(/^(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2})\s+-\s+(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2})\s+-\s+\d+\s+____D\s+(.*)$/);
+                    if (folderMatch) {
+                        const pathData = getBaseAndExt(folderMatch[5].trim());
+                        const fileEntry = new FileEntry(folderMatch[5].trim(), pathData.name, '', 0, `${folderMatch[1]} ${folderMatch[2]}`, `${folderMatch[3]} ${folderMatch[4]}`, '', true);
+                        if (type === 'created') this.scan.filesCreated.push(fileEntry); else this.scan.filesModified.push(fileEntry);
+                    }
+                }
+            }
+
+            parseAdsLine(line) {
+                const match = line.match(/AlternateDataStreams:\s+(.+):(.+)\s+\[(\d+)\]/);
+                if (match) this.scan.alternateDataStreams.push({ path: match[1], stream: match[2], size: parseInt(match[3], 10) });
+            }
+
+            correlate() {
+                const fileMap = new Map();
+                for (const file of this.scan.filesCreated) fileMap.set(file.path.toLowerCase(), file);
+                for (const task of this.scan.tasks) {
+                    const taskPath = task.path ? task.path.toLowerCase() : '';
+                    if (fileMap.has(taskPath)) {
+                        if (!this.correlations.has(task)) this.correlations.set(task, {});
+                        this.correlations.get(task).linkedFile = fileMap.get(taskPath);
+                    }
+                }
+            }
+
+            detectThreats() {
+                for (const task of this.scan.tasks) {
+                    const correlations = { hasFile: this.correlations.has(task), fileScore: (this.correlations.has(task) && this.correlations.get(task).linkedFile) ? 50 : 0 };
+                    const { score, reasons } = ThreatScorer.scoreTask(task, correlations);
+                    if (score >= 30) this.findings.push(new ThreatFinding(task, score, reasons, 'task', `Task matches structural trigger attributes: ${task.name}`));
+                }
+                for (const file of this.scan.filesCreated) {
+                    const correlations = {
+                        hasTask: this.scan.tasks.some(t => t.path && t.path.toLowerCase() === file.path.toLowerCase()),
+                        hasRunEntry: this.scan.registryRun.some(r => r.data && r.data.toLowerCase() === file.path.toLowerCase()),
+                        hasDefenderExclusion: this.scan.registryPolicies.some(p => p.toLowerCase().includes(file.path.toLowerCase()))
+                    };
+                    const { score, reasons } = ThreatScorer.scoreFile(file, correlations);
+                    if (score >= 35) this.findings.push(new ThreatFinding(file, score, reasons, 'file', file.path));
+                }
+                for (const policy of this.scan.registryPolicies) {
+                    const fakeReg = new RegistryEntry(policy, '', '', 'policy');
+                    const { score, reasons } = ThreatScorer.scoreRegistry(fakeReg);
+                    if (score >= 40) this.findings.push(new ThreatFinding(policy, score, reasons, 'registry', policy));
+                }
+                for (const rule of this.scan.firewallRules) {
+                    const { score, reasons } = ThreatScorer.scoreFirewallRule(rule);
+                    if (score > 0) this.findings.push(new ThreatFinding(rule, score, reasons, 'firewall', `Firewall explicit trigger mapping rule checked.`));
+                }
+                for (const ads of this.scan.alternateDataStreams) {
+                    if (!ads.stream.includes('Zone.Identifier')) {
+                        this.findings.push(new ThreatFinding(ads, 45, ['Alternate Data Stream not Zone.Identifier'], 'ads', `ADS Match telemetry: ${ads.path}:${ads.stream}`));
+                    }
+                }
+            }
+
+            generateFixlist() {
+                const fixlistLines = [];
+                const sorted = [...this.findings].sort((a, b) => b.score - a.score);
+                for (const finding of sorted) {
+                    if (finding.type === 'task') {
+                        fixlistLines.push(`Task: {${finding.item.guid}} - System32\\Tasks\\${finding.item.name}`);
+                        if (finding.item.path && !finding.item.path.includes('No File')) fixlistLines.push(finding.item.path);
+                    } else if (finding.type === 'file') {
+                        if (finding.item.isDirectory) {
+                            fixlistLines.push(`Folder: ${finding.item.path}`); fixlistLines.push(finding.item.path);
+                        } else {
+                            fixlistLines.push(finding.item.path);
+                        }
+                    } else if (finding.type === 'registry') {
+                        fixlistLines.push(finding.item);
+                    } else if (finding.type === 'firewall') {
+                        fixlistLines.push(`FirewallRules: [{${finding.item.guid}}] => (${finding.item.action}) ${finding.item.filePath} => No File`);
+                    } else if (finding.type === 'ads') {
+                        fixlistLines.push(`AlternateDataStreams: ${finding.item.path}:${finding.item.stream} [${finding.item.size}]`);
+                    }
+                }
+                return fixlistLines;
+            }
+        }
+
+        // ----------------------------------------------------------------------
+        // DOM Workspace Controller Routine Scripts Block
+        // ----------------------------------------------------------------------
         function safeGetStorage(key, defaultVal) {
             try { return JSON.parse(localStorage.getItem(key)) || defaultVal; } catch (e) { return defaultVal; }
         }
@@ -407,17 +782,13 @@ End::</textarea>
             const fileNameDisplay = document.getElementById('file-name');
             if (fileInput.files.length === 0) return;
             
-            let fileNames = [];
-            let combinedContent = "";
-
+            let fileNames = []; let combinedContent = "";
             for (let i = 0; i < fileInput.files.length; i++) {
-                let file = fileInput.files[i];
-                fileNames.push(file.name);
+                let file = fileInput.files[i]; fileNames.push(file.name);
                 let text = await file.text();
                 if(i > 0) combinedContent += `\n==================== End of Previous Log ====================\n\n`;
                 combinedContent += text + "\n";
             }
-
             fileNameDisplay.innerText = fileNames.join(', ');
             document.getElementById('log-input').value = combinedContent;
             renderLog();
@@ -434,11 +805,8 @@ End::</textarea>
             const jumper = document.getElementById('section-jumper');
             jumper.innerHTML = '<option value="">-- Jump to Section --</option>';
 
-            const frstGroup = document.createElement('optgroup');
-            frstGroup.label = "─── FRST.txt Sections ───";
-            const additionGroup = document.createElement('optgroup');
-            additionGroup.label = "─── Addition.txt Sections ───";
-
+            const frstGroup = document.createElement('optgroup'); frstGroup.label = "─── FRST.txt Sections ───";
+            const additionGroup = document.createElement('optgroup'); additionGroup.label = "─── Addition.txt Sections ───";
             const fragment = document.createDocumentFragment();
 
             let yellowDb = safeGetStorage('frst_yellow_db', []);
@@ -452,8 +820,7 @@ End::</textarea>
                     const cleanTitle = line.replace(/=/g, '').trim();
                     const lowerTitle = cleanTitle.toLowerCase();
                     const opt = document.createElement('option');
-                    opt.value = `log-L${index}`;
-                    opt.textContent = cleanTitle;
+                    opt.value = `log-L${index}`; opt.textContent = cleanTitle;
 
                     if (frstSections.some(sec => lowerTitle.includes(sec))) frstGroup.appendChild(opt);
                     else if (additionSections.some(sec => lowerTitle.includes(sec))) additionGroup.appendChild(opt);
@@ -468,8 +835,7 @@ End::</textarea>
                 else if (orangeDb.some(term => lowerLine.includes(term.toLowerCase()))) lineEl.classList.add('hl-orange');
                 else if (yellowDb.some(term => lowerLine.includes(term.toLowerCase()))) lineEl.classList.add('hl-yellow');
 
-                lineEl.innerHTML = safeLine || '&nbsp;';
-                fragment.appendChild(lineEl);
+                lineEl.innerHTML = safeLine || '&nbsp;'; fragment.appendChild(lineEl);
             });
             
             if (frstGroup.children.length > 0) jumper.appendChild(frstGroup);
@@ -480,16 +846,57 @@ End::</textarea>
             document.getElementById('utility-bar').style.display = 'flex';
         }
 
+        function runAutomatedThreatParser() {
+            const rawContent = document.getElementById('log-input').value;
+            if (!rawContent) return alert("No log data loaded.");
+
+            const engine = new FrstParser();
+            engine.parseFrstContent(rawContent);
+
+            const tbody = document.getElementById('threat-tbody');
+            tbody.innerHTML = '';
+
+            // Render Findings sorted cleanly by descending weighted threat score
+            const sortedFindings = [...engine.findings].sort((a, b) => b.score - a.score);
+            sortedFindings.forEach(f => {
+                tbody.innerHTML += `<tr>
+                    <td><b style="color:#ffeb3b;">${f.score}</b></td>
+                    <td><span style="color:#fff; font-weight:bold;">${f.reasons.join(', ')}</span></td>
+                    <td style="word-break:break-all; font-family:monospace; font-size:10px;">${escapeHTML(f.line)}</td>
+                </tr>`;
+            });
+
+            document.getElementById('summary-stats').innerHTML = `Total Identified Indicators Flagged: ${engine.findings.length}`;
+
+            // Build Compiled Direct Fixlist Directives Area Block
+            const fixlistCommands = engine.generateFixlist();
+            
+            const cleanupCommands = [
+                'C:\\Windows\\System32\\GroupPolicy', 'C:\\Windows\\System32\\GroupPolicyUsers', '',
+                'StartPowershell:', '$Paths = (Get-MpPreference).ExclusionPath', '$Processes = (Get-MpPreference).ExclusionProcess',
+                'foreach ($Path in $Paths) { Remove-MpPreference -ExclusionPath $Path -Force -ErrorAction SilentlyContinue }',
+                'foreach ($Process in $Processes) { Remove-MpPreference -ExclusionProcess $Process -Force -ErrorAction SilentlyContinue }',
+                'Set-MpPreference -DisableRealtimeMonitoring $false', 'Set-MpPreference -DisableAntiSpyware $false',
+                'Set-MpPreference -DisableAntiVirus $false', 'Update-MpSignature', 'EndPowershell:', '',
+                'CMD: netsh int ip reset', 'CMD: netsh int ipv6 reset', 'CMD: ipconfig /flushdns', 'CMD: netsh winsock reset catalog', '',
+                'Hosts:', 'EmptyTemp:'
+            ];
+
+            const outputScript = `Start::\nCreateRestorePoint:\nCloseProcesses:\n\n${fixlistCommands.join('\n')}\n\n${cleanupCommands.join('\n')}\nEnd::`;
+            document.getElementById('auto-fixlist-area').value = outputScript;
+
+            openModal('auto-parse-modal');
+        }
+
         function runManualSearchQuery() {
             const inputEl = document.getElementById('lookup-filename-input');
             const targetEntry = inputEl.value.trim();
             if(!targetEntry) return;
-
             const targetUrl = 'https://www.google.com/search?q=' + encodeURIComponent(targetEntry);
             window.open(targetUrl, '_blank');
         }
 
-        // --- SINGLE-CLICK TO COPY EVENT ---
+        // --- SINGLE-CLICK TO COPY HANDLER EVENT LISTENER ---
         const logDisplay = document.getElementById('log-display');
         logDisplay.addEventListener('click', function(e) {
             let targetDiv = e.target.closest('div[id^="log-L"]');
@@ -533,12 +940,8 @@ End::</textarea>
             const content = document.getElementById('fixlist-area').value;
             const blob = new Blob([content], { type: 'text/plain' });
             const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'fixlist.txt';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
+            const a = document.createElement('a'); a.href = url; a.download = 'fixlist.txt';
+            document.body.appendChild(a); a.click(); document.body.removeChild(a);
             URL.revokeObjectURL(url);
         }
 
@@ -547,9 +950,7 @@ End::</textarea>
             if(id === 'tools-modal') document.getElementById('tool-instruction').focus();
         }
 
-        function closeModal(id) {
-            document.getElementById(id).style.display = 'none';
-        }
+        function closeModal(id) { document.getElementById(id).style.display = 'none'; }
 
         function processInstruction() {
             const instruction = document.getElementById('tool-instruction').value.trim();
@@ -559,53 +960,37 @@ End::</textarea>
                 if (line.includes(instruction)) extractedLines.push(line);
             }
             document.getElementById('results-area').value = extractedLines.join('\n');
-            closeModal('tools-modal');
-            openModal('results-modal');
+            closeModal('tools-modal'); openModal('results-modal');
             document.getElementById('copy-btn').innerText = 'Copy All';
         }
 
         function copyResults(textareaId, buttonId) {
             const resultsArea = document.getElementById(textareaId);
-            resultsArea.select();
-            resultsArea.setSelectionRange(0, 99999);
+            resultsArea.select(); resultsArea.setSelectionRange(0, 99999);
             navigator.clipboard.writeText(resultsArea.value).then(() => {
                 document.getElementById(buttonId).innerText = 'Copied!';
             });
         }
 
-        function openHelperModal() {
-            loadHelperEntries();
-            renderDatabaseKeywords();
-            openModal('helper-modal');
-        }
+        function openHelperModal() { loadHelperEntries(); renderDatabaseKeywords(); openModal('helper-modal'); }
 
         function saveDatabaseKeyword(color) {
             const inputEl = document.getElementById('db-keyword-input');
-            const keyword = inputEl.value.trim();
-            if(!keyword) return;
+            const keyword = inputEl.value.trim(); if(!keyword) return;
 
             let storageKey = color === 'orange' ? 'frst_orange_db' : 'frst_yellow_db';
             let db = safeGetStorage(storageKey, []);
-            
-            if(!db.includes(keyword)) {
-                db.push(keyword);
-                safeSetStorage(storageKey, db);
-            }
-            inputEl.value = '';
-            renderDatabaseKeywords();
+            if(!db.includes(keyword)) { db.push(keyword); safeSetStorage(storageKey, db); }
+            inputEl.value = ''; renderDatabaseKeywords();
             if(currentLogLines.length > 0) renderLog();
         }
 
         function renderDatabaseKeywords() {
             const holder = document.getElementById('db-keywords-holder');
-            let yellowDb = safeGetStorage('frst_yellow_db', []);
-            let orangeDb = safeGetStorage('frst_orange_db', []);
-            
+            let yellowDb = safeGetStorage('frst_yellow_db', []); let orangeDb = safeGetStorage('frst_orange_db', []);
             if(yellowDb.length === 0 && orangeDb.length === 0) {
-                holder.innerHTML = '<p style="font-size:11px; color:#666; margin:0;">Databases empty.</p>';
-                return;
+                holder.innerHTML = '<p style="font-size:11px; color:#666; margin:0;">Databases empty.</p>'; return;
             }
-            
             let html = '';
             yellowDb.forEach((k, idx) => { html += `<span class="db-tag db-tag-yellow">${escapeHTML(k)} <b style="color:red; cursor:pointer; margin-left:6px;" onclick="deleteDatabaseKeyword('yellow', ${idx})">&times;</b></span>`; });
             orangeDb.forEach((k, idx) => { html += `<span class="db-tag db-tag-orange">${escapeHTML(k)} <b style="color:red; cursor:pointer; margin-left:6px;" onclick="deleteDatabaseKeyword('orange', ${idx})">&times;</b></span>`; });
@@ -614,34 +999,23 @@ End::</textarea>
 
         function deleteDatabaseKeyword(color, index) {
             let storageKey = color === 'orange' ? 'frst_orange_db' : 'frst_yellow_db';
-            let db = safeGetStorage(storageKey, []);
-            db.splice(index, 1);
-            safeSetStorage(storageKey, db);
-            renderDatabaseKeywords();
-            if(currentLogLines.length > 0) renderLog();
+            let db = safeGetStorage(storageKey, []); db.splice(index, 1); safeSetStorage(storageKey, db);
+            renderDatabaseKeywords(); if(currentLogLines.length > 0) renderLog();
         }
 
         function saveHelperEntry() {
             const sectionTitle = document.getElementById('helper-input-section').value.trim() || 'General Snippet';
-            const textValue = document.getElementById('helper-input-text').value.trim();
-            if (!textValue) return;
-
+            const textValue = document.getElementById('helper-input-text').value.trim(); if (!textValue) return;
             let items = safeGetStorage('frst_helper_items', []);
-            items.push({ id: Date.now(), section: sectionTitle, content: textValue });
-            safeSetStorage('frst_helper_items', items);
-            
-            document.getElementById('helper-input-section').value = '';
-            document.getElementById('helper-input-text').value = '';
+            items.push({ id: Date.now(), section: sectionTitle, content: textValue }); safeSetStorage('frst_helper_items', items);
+            document.getElementById('helper-input-section').value = ''; document.getElementById('helper-input-text').value = '';
             loadHelperEntries();
         }
 
         function loadHelperEntries() {
             const displayBox = document.getElementById('helper-saved-list');
             let items = safeGetStorage('frst_helper_items', []);
-            if(items.length === 0) {
-                displayBox.innerHTML = '<p style="color:#666; font-style:italic;">No saved snippets.</p>';
-                return;
-            }
+            if(items.length === 0) { displayBox.innerHTML = '<p style="color:#666; font-style:italic;">No saved snippets.</p>'; return; }
             let html = '';
             items.forEach(item => {
                 html += `<div class="helper-section"><div class="helper-title"><span>📂 ${escapeHTML(item.section)}</span><span class="delete-btn" onclick="deleteHelperEntry(${item.id})">❌ Delete</span></div><div class="helper-body" onclick="document.execCommand('copy')">${escapeHTML(item.content)}</div></div>`;
@@ -650,15 +1024,11 @@ End::</textarea>
         }
 
         function deleteHelperEntry(id) {
-            let items = safeGetStorage('frst_helper_items', []);
-            items = items.filter(item => item.id !== id);
-            safeSetStorage('frst_helper_items', items);
-            loadHelperEntries();
+            let items = safeGetStorage('frst_helper_items', []); items = items.filter(item => item.id !== id);
+            safeSetStorage('frst_helper_items', items); loadHelperEntries();
         }
 
-        function escapeHTML(str) {
-            return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-        }
+        function escapeHTML(str) { return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
     </script>
 </body>
 </html>
