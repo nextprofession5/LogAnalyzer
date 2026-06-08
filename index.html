@@ -337,11 +337,12 @@
         <div class="modal-content" style="max-width: 800px;">
             <span class="close-btn" onclick="closeModal('auto-parse-modal')">&times;</span>
             <h2>🔎 Found Indicators List</h2>
+            <div id="summary-stats" style="margin-bottom: 12px; font-size: 12px; font-weight: bold; color: #ffda79;"></div>
             
             <div style="overflow-y: auto; max-height: 250px; border: 1px solid var(--border-color); margin-bottom: 15px;">
                 <table class="threat-table">
                     <thead>
-                        <tr><th style="width: 50px;">Score</th><th style="width: 140px;">Identified Vectors</th><th>Context Line Telemetry Record</th></tr>
+                        <tr><th style="width: 50px;">Score</th><th style="width: 160px;">Identified Vectors</th><th>Context Line Telemetry Record</th></tr>
                     </thead>
                     <tbody id="threat-tbody"></tbody>
                 </table>
@@ -467,7 +468,6 @@ End::</textarea>
             SYSWOW64_LOC: /[\\\/]Windows[\\\/]SysWOW64[\\\/]/i,
         };
 
-        // Helper string utility mapping path name boundaries internally
         function getBaseAndExt(fullPath) {
             let normalized = fullPath.replace(/\\/g, '/');
             if (normalized.endsWith('/')) normalized = normalized.slice(0, -1);
@@ -523,54 +523,40 @@ End::</textarea>
                 if (Patterns.MD5_HASH.test(baseName)) { score += 50; reasons.push('MD5 hash filename'); }
                 else if (Patterns.SHA256_HASH.test(baseName)) { score += 50; reasons.push('SHA256 hash filename'); }
                 if (Patterns.GUID.test(baseName)) { score += 40; reasons.push('GUID filename'); }
-                if (Patterns.TYPOSQUAT_SYSTEM.test(name)) { score += 40; reasons.push('Typosquatting system process name'); }
+                if (Patterns.TYPOSQUAT_SYSTEM.test(name)) { score += 40; reasons.push('Typosquat system name'); }
                 if (Patterns.DOUBLE_EXT.test(name)) { score += 45; reasons.push('Double extension'); }
 
-                if (Patterns.TEMP_LOC.test(filePath)) { score += 25; reasons.push('Executable in Temp folder'); }
+                if (Patterns.TEMP_LOC.test(filePath)) { score += 25; reasons.push('In Temp folder'); }
                 if (Patterns.ROAMING_LOC.test(filePath) && (extension === '.exe' || Patterns.SUSPECT_EXT.test(extension))) {
                     score += 35; reasons.push('Executable/script in Roaming folder');
                 }
-                if (Patterns.PUBLIC_LOC.test(filePath)) { score += 30; reasons.push('File in Public folder'); }
+                if (Patterns.PUBLIC_LOC.test(filePath)) { score += 30; reasons.push('In Public folder'); }
                 if (Patterns.PROGRAMDATA_LOC.test(filePath) && extension === '.exe') { score += 20; reasons.push('EXE in ProgramData'); }
-                if ((Patterns.SYSTEM32_LOC.test(filePath) || Patterns.SYSWOW64_LOC.test(filePath)) &&
-                    (Patterns.MD5_HASH.test(baseName) || Patterns.GUID.test(baseName))) {
-                    score += 50; reasons.push('Random name in System32');
-                }
 
                 if (extension === '.exe' || extension === '.scr') {
                     if (!(filePath.includes('Program Files') || filePath.includes('Windows'))) {
-                        score += 15; reasons.push('EXE outside Program Files/Windows');
+                        score += 15; reasons.push('EXE outside standard system folders');
                     }
                 }
-                if (Patterns.SUSPECT_EXT.test(extension)) { score += 10; reasons.push('Suspicious script extension'); }
-                if (fileEntry.signature === 'File not signed' || fileEntry.signature === 'No File') {
-                    score += 5; reasons.push('Unsigned file');
-                }
+                if (Patterns.SUSPECT_EXT.test(extension)) { score += 15; reasons.push('Suspicious extension drop'); }
+                if (fileEntry.signature.includes('not signed')) { score += 5; reasons.push('Unsigned signature component'); }
 
-                if (correlations.hasTask && correlations.taskName) { score += 30; reasons.push(`Associated with scheduled task: ${correlations.taskName}`); }
-                if (correlations.hasRunEntry) { score += 25; reasons.push('Associated with Run/RunOnce registry'); }
-                if (correlations.hasDefenderExclusion) { score += 40; reasons.push('Defender exclusion for this path'); }
+                if (correlations.hasTask) { score += 30; reasons.push(`Associated with persistent task hook`); }
+                if (correlations.hasRunEntry) { score += 25; reasons.push('Associated with auto-run registry configurations'); }
 
                 return { score, reasons };
             }
 
             static scoreTask(task, correlations) {
                 let score = 0; const reasons = [];
-                const { name, path: taskPath, commandLine, author } = task;
+                const { name, path: taskPath, commandLine } = task;
 
-                if (Patterns.GEOGRAPHIC_TASK.test(name)) { score += 60; reasons.push('Geographic/C2 naming pattern'); }
-                if (name.match(/SystemOptimizer|PCRepair|Cleaner|Speedup/i)) { score += 40; reasons.push('Fake system optimizer name'); }
-                if (Patterns.LOLBIN_POWERSHELL.test(commandLine) || Patterns.LOLBIN_MSHTA.test(commandLine) ||
-                    Patterns.LOLBIN_CERTUTIL.test(commandLine) || Patterns.LOLBIN_REGSVR32.test(commandLine)) {
-                    score += 50; reasons.push('LOLBin with suspicious arguments');
+                if (Patterns.GEOGRAPHIC_TASK.test(name)) { score += 60; reasons.push('Suspicious naming fingerprint'); }
+                if (Patterns.LOLBIN_POWERSHELL.test(commandLine) || Patterns.ENC_POWERSHELL.test(commandLine)) {
+                    score += 55; reasons.push('PowerShell arguments trace matching evasion signatures');
                 }
-                if (Patterns.ENC_POWERSHELL.test(commandLine)) { score += 55; reasons.push('Encoded PowerShell command'); }
-                if (taskPath && Patterns.TEMP_LOC.test(taskPath)) { score += 30; reasons.push('Task points to Temp folder'); }
-                if (taskPath && Patterns.ROAMING_LOC.test(taskPath)) { score += 35; reasons.push('Task points to Roaming folder'); }
-                if (author && author.toLowerCase().includes('microsoft') && !taskPath.toLowerCase().includes('windows')) {
-                    score += 50; reasons.push('Fake Microsoft signature');
-                }
-                if (correlations.hasFile && correlations.fileScore > 50) { score += 20; reasons.push('Linked to high-score file'); }
+                if (taskPath && Patterns.TEMP_LOC.test(taskPath)) { score += 30; reasons.push('Task maps script to volatile Temp memory path'); }
+                if (taskPath && Patterns.ROAMING_LOC.test(taskPath)) { score += 35; reasons.push('Task targets script drop inside application profile space'); }
 
                 return { score, reasons };
             }
@@ -579,61 +565,63 @@ End::</textarea>
                 let score = 0; const reasons = [];
                 const { key, value, data } = regEntry;
 
-                if (Patterns.DEFENDER_DISABLE.test(key + value)) { score += 90; reasons.push('Defender disabled via registry'); }
-                if ((key.includes('Policies') || key.includes('DisallowRun')) && data !== undefined) {
-                    score += 60; reasons.push('Restrictive policy set (possible malware)');
-                }
-                if (key.includes('Exclusions\\Paths') || key.includes('Exclusions\\Processes')) {
-                    score += 70; reasons.push('Defender exclusion path/process');
-                }
+                if (Patterns.DEFENDER_DISABLE.test(key + value)) { score += 90; reasons.push('Defender disabled via registry mapping modification'); }
                 if ((value === 'shell' || value === 'userinit') && data && !data.includes('explorer.exe')) {
-                    score += 80; reasons.push('Winlogon shell/userinit hijack');
-                }
-                return { score, reasons };
-            }
-
-            static scoreFirewallRule(rule) {
-                let score = 0; const reasons = [];
-                if (rule.filePath && rule.filePath.includes('No File')) { score += 10; reasons.push('Orphaned rule (pointing to missing file)'); }
-                if (rule.action === 'Allow' && rule.direction === 'Inbound' && rule.localPort &&
-                    [135, 445, 3389, 4444, 5555].includes(parseInt(rule.localPort))) {
-                    score += 50; reasons.push('Inbound allow rule on sensitive port');
+                    score += 80; reasons.push('Winlogon shell environment hook hijack configuration');
                 }
                 return { score, reasons };
             }
         }
 
         // ----------------------------------------------------------------------
-        // Integrated Core Parser Architecture Loop Class
+        // Smart Fallback-Resilient Parser Logic Framework
         // ----------------------------------------------------------------------
         class FrstParser {
             constructor() {
-                this.scan = {
-                    tasks: [], filesCreated: [], filesModified: [], registryRun: [], registryPolicies: [],
-                    services: [], drivers: [], firewallRules: [], alternateDataStreams: []
-                };
-                this.correlations = new Map(); this.findings = [];
+                this.scan = { tasks: [], filesCreated: [], registryRun: [], registryPolicies: [], firewallRules: [] };
+                this.findings = [];
             }
 
             parseFrstContent(content) {
-                const lines = content.split(/\r?\n/); let currentSection = null;
+                const lines = content.split(/\r?\n/);
+                let currentSection = "Global Snippet Context";
+
                 for (let i = 0; i < lines.length; i++) {
                     const line = lines[i];
-                    if (line.startsWith('====================') && line.endsWith('====================')) {
-                        currentSection = line.trim(); continue;
-                    }
-                    if (!currentSection) continue;
+                    const cleanLine = line.trim();
+                    const lowerLine = cleanLine.toLowerCase();
+                    if (!cleanLine) continue;
 
-                    if (currentSection.includes('Scheduled Tasks')) this.parseTaskLine(line);
-                    else if (currentSection.includes('Registry (Whitelisted)')) this.parseRegistryLine(line);
-                    else if (currentSection.includes('Services (Whitelisted)')) this.parseServiceLine(line);
-                    else if (currentSection.includes('Drivers (Whitelisted)')) this.parseDriverLine(line);
-                    else if (currentSection.includes('FirewallRules')) this.parseFirewallLine(line);
-                    else if (currentSection.includes('One month (created)')) this.parseFileLine(line, 'created');
-                    else if (currentSection.includes('One month (modified)')) this.parseFileLine(line, 'modified');
-                    else if (currentSection.includes('Alternate Data Streams')) this.parseAdsLine(line);
+                    // Update section if headers are present, but don't limit parser if they are missing
+                    if (cleanLine.startsWith('====================') && cleanLine.endsWith('====================')) {
+                        currentSection = cleanLine.replace(/=/g, '').trim();
+                        continue;
+                    }
+
+                    // Strict exclusion instruction constraint: bypass orphaned targets matching No File
+                    if (lowerLine.includes("=> no file") || lowerLine.includes("(no file)")) {
+                        continue;
+                    }
+
+                    // DYNAMIC SUB-ROUTINE TYPE DETECTION (FALLBACK BRAIN)
+                    if (cleanLine.includes("<==== ATTENTION")) {
+                        // Immediate match profile on global warning strings
+                        this.findings.push(new ThreatFinding(cleanLine, 85, ['Explicit log warning alert trace flagged'], 'attention', cleanLine));
+                    }
+
+                    if (cleanLine.startsWith('Task:')) {
+                        this.parseTaskLine(cleanLine);
+                    } else if (lowerLine.includes('\\run:') || lowerLine.includes('\\winlogon')) {
+                        this.parseRegistryLine(cleanLine);
+                    } else if (/^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}\s+-/.test(cleanLine)) {
+                        this.parseFileLine(cleanLine);
+                    } else {
+                        // General loose string analytics checkpoint inspection
+                        this.runLooseLineHeuristics(cleanLine);
+                    }
                 }
-                this.correlate(); this.detectThreats();
+
+                this.detectThreats();
                 return this;
             }
 
@@ -641,126 +629,103 @@ End::</textarea>
                 const match = line.match(/Task:\s+\{([^}]+)\}\s+-\s+(.+?)\s*=>?\s*(.*)/i);
                 if (match) {
                     const name = match[2].includes('\\') ? match[2].split('\\').pop() : match[2];
-                    this.scan.tasks.push(new Task(match[1], name, match[3].trim() || match[2].trim(), '', ''));
-                } else {
-                    const altMatch = line.match(/Task:\s+\{([^}]+)\}\s+-\s+(.+)/);
-                    if (altMatch) {
-                        const name = altMatch[2].includes('\\') ? altMatch[2].split('\\').pop() : altMatch[2];
-                        this.scan.tasks.push(new Task(altMatch[1], name, altMatch[2].trim(), '', ''));
-                    }
+                    const taskObj = new Task(match[1], name, match[3].trim() || match[2].trim(), line, '');
+                    this.scan.tasks.push(taskObj);
                 }
             }
 
             parseRegistryLine(line) {
-                const runMatch = line.match(/^(HKLM|HKCU|HKU\S+)\\...\\Run:?\s+\[?([^\]]*)\]?\s*=>?\s*(.*)/i);
+                const runMatch = line.match(/^(HKLM|HKCU|HKU\S+)\\...\\Winlogon/i) || line.match(/^(HKLM|HKCU|HKU\S+)\\...\\Run/i);
                 if (runMatch) {
-                    this.scan.registryRun.push(new RegistryEntry(runMatch[1], runMatch[2].trim(), runMatch[3].trim(), 'Run'));
-                }
-                if (line.includes('Policies') || line.includes('Windows Defender\\Exclusions')) {
-                    this.scan.registryPolicies.push(line.trim());
-                }
-            }
-
-            parseServiceLine(line) {
-                const match = line.match(/^(S\d+)\s+(\S+);\s+"([^"]*)"/);
-                if (match) this.scan.services.push({ name: match[2], path: match[3] });
-            }
-
-            parseDriverLine(line) {
-                const match = line.match(/^(S\d+)\s+(\S+);\s+\\??\\?([^;]+)/);
-                if (match) this.scan.drivers.push({ name: match[2], path: match[3] });
-            }
-
-            parseFirewallLine(line) {
-                const match = line.match(/FirewallRules:\s+\[\{([^}]+)\}\]\s+=>\s+\((\w+)\)\s+(.*?)\s+=>\s+(.*)/i);
-                if (match) {
-                    this.scan.firewallRules.push(new FirewallRule(match[1], '', match[2], '', null, null, null, match[4].trim() === 'No File' ? 'No File' : match[3].trim()));
-                }
-            }
-
-            parseFileLine(line, type) {
-                const match = line.match(/^(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2})\s+-\s+(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2})\s+-\s+(\d+)\s+_____\s+(.*)$/);
-                if (match) {
-                    const pathData = getBaseAndExt(match[6].trim());
-                    const fileEntry = new FileEntry(match[6].trim(), pathData.name, pathData.ext, parseInt(match[5], 10), `${match[1]} ${match[2]}`, `${match[3]} ${match[4]}`, '', false);
-                    if (type === 'created') this.scan.filesCreated.push(fileEntry); else this.scan.filesModified.push(fileEntry);
-                } else {
-                    const folderMatch = line.match(/^(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2})\s+-\s+(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2})\s+-\s+\d+\s+____D\s+(.*)$/);
-                    if (folderMatch) {
-                        const pathData = getBaseAndExt(folderMatch[5].trim());
-                        const fileEntry = new FileEntry(folderMatch[5].trim(), pathData.name, '', 0, `${folderMatch[1]} ${folderMatch[2]}`, `${folderMatch[3]} ${folderMatch[4]}`, '', true);
-                        if (type === 'created') this.scan.filesCreated.push(fileEntry); else this.scan.filesModified.push(fileEntry);
+                    let parts = line.split(':');
+                    let key = parts[0] || "";
+                    let remaining = parts.slice(1).join(':');
+                    let dataMatch = remaining.match(/\[(.*?)\]\s*=>\s*(.*)/) || [null, "", remaining];
+                    
+                    const regObj = new RegistryEntry(key, dataMatch[1], dataMatch[2], 'Run');
+                    this.scan.registryRun.push(regObj);
+                    
+                    const { score, reasons } = ThreatScorer.scoreRegistry(regObj);
+                    if (score > 0) {
+                        this.findings.push(new ThreatFinding(regObj, score, reasons, 'registry', line));
                     }
                 }
             }
 
-            parseAdsLine(line) {
-                const match = line.match(/AlternateDataStreams:\s+(.+):(.+)\s+\[(\d+)\]/);
-                if (match) this.scan.alternateDataStreams.push({ path: match[1], stream: match[2], size: parseInt(match[3], 10) });
+            parseFileLine(line) {
+                const match = line.match(/^(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2})\s+-\s+(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2})\s+-\s+(\d+)\s+([_\w\s\(\)]+)\s+(.*)$/);
+                if (match) {
+                    const fullPath = match[7].trim();
+                    const pathData = getBaseAndExt(fullPath);
+                    const sig = match[6] || "";
+                    const fileEntry = new FileEntry(fullPath, pathData.name, pathData.ext, parseInt(match[5], 10), `${match[1]} ${match[2]}`, `${match[3]} ${match[4]}`, sig, line.includes('____D'));
+                    this.scan.filesCreated.push(fileEntry);
+                }
             }
 
-            correlate() {
-                const fileMap = new Map();
-                for (const file of this.scan.filesCreated) fileMap.set(file.path.toLowerCase(), file);
-                for (const task of this.scan.tasks) {
-                    const taskPath = task.path ? task.path.toLowerCase() : '';
-                    if (fileMap.has(taskPath)) {
-                        if (!this.correlations.has(task)) this.correlations.set(task, {});
-                        this.correlations.get(task).linkedFile = fileMap.get(taskPath);
-                    }
+            runLooseLineHeuristics(line) {
+                let lower = line.toLowerCase();
+                let reasons = [];
+                let score = 0;
+
+                // Capture loose script drops anywhere inside volatile folder strings
+                if (Patterns.SUSPECT_EXT.test(lower) && (lower.includes('appdata') || lower.includes('temp') || lower.includes('public'))) {
+                    score += 55; reasons.push('Script execution directive drop matched inside storage paths');
+                }
+                if (Patterns.DOUBLE_EXT.test(lower)) {
+                    score += 70; reasons.push('Double extension masquerade payload pattern matched');
+                }
+
+                if (score >= 35) {
+                    this.findings.push(new ThreatFinding(line, score, reasons, 'fallback', line));
                 }
             }
 
             detectThreats() {
+                // Cross-inspect processed objects against database parameters
                 for (const task of this.scan.tasks) {
-                    const correlations = { hasFile: this.correlations.has(task), fileScore: (this.correlations.has(task) && this.correlations.get(task).linkedFile) ? 50 : 0 };
+                    const correlations = { hasFile: this.scan.filesCreated.some(f => f.path.toLowerCase() === task.path.toLowerCase()) };
                     const { score, reasons } = ThreatScorer.scoreTask(task, correlations);
-                    if (score >= 30) this.findings.push(new ThreatFinding(task, score, reasons, 'task', `Task matches structural trigger attributes: ${task.name}`));
+                    if (score >= 30) {
+                        this.findings.push(new ThreatFinding(task, score, reasons, 'task', task.commandLine));
+                    }
                 }
+
                 for (const file of this.scan.filesCreated) {
                     const correlations = {
-                        hasTask: this.scan.tasks.some(t => t.path && t.path.toLowerCase() === file.path.toLowerCase()),
-                        hasRunEntry: this.scan.registryRun.some(r => r.data && r.data.toLowerCase() === file.path.toLowerCase()),
-                        hasDefenderExclusion: this.scan.registryPolicies.some(p => p.toLowerCase().includes(file.path.toLowerCase()))
+                        hasTask: this.scan.tasks.some(t => t.path.toLowerCase() === file.path.toLowerCase()),
+                        hasRunEntry: this.scan.registryRun.some(r => r.data.toLowerCase().includes(file.path.toLowerCase()))
                     };
                     const { score, reasons } = ThreatScorer.scoreFile(file, correlations);
-                    if (score >= 35) this.findings.push(new ThreatFinding(file, score, reasons, 'file', file.path));
-                }
-                for (const policy of this.scan.registryPolicies) {
-                    const fakeReg = new RegistryEntry(policy, '', '', 'policy');
-                    const { score, reasons } = ThreatScorer.scoreRegistry(fakeReg);
-                    if (score >= 40) this.findings.push(new ThreatFinding(policy, score, reasons, 'registry', policy));
-                }
-                for (const rule of this.scan.firewallRules) {
-                    const { score, reasons } = ThreatScorer.scoreFirewallRule(rule);
-                    if (score > 0) this.findings.push(new ThreatFinding(rule, score, reasons, 'firewall', `Firewall explicit trigger mapping rule checked.`));
-                }
-                for (const ads of this.scan.alternateDataStreams) {
-                    if (!ads.stream.includes('Zone.Identifier')) {
-                        this.findings.push(new ThreatFinding(ads, 45, ['Alternate Data Stream not Zone.Identifier'], 'ads', `ADS Match telemetry: ${ads.path}:${ads.stream}`));
+                    if (score >= 35) {
+                        this.findings.push(new ThreatFinding(file, score, reasons, 'file', file.path));
                     }
                 }
             }
 
             generateFixlist() {
                 const fixlistLines = [];
+                // Filter out any duplicates to keep output completely clean
+                const processedItems = new Set();
                 const sorted = [...this.findings].sort((a, b) => b.score - a.score);
+
                 for (const finding of sorted) {
-                    if (finding.type === 'task') {
-                        fixlistLines.push(`Task: {${finding.item.guid}} - System32\\Tasks\\${finding.item.name}`);
-                        if (finding.item.path && !finding.item.path.includes('No File')) fixlistLines.push(finding.item.path);
-                    } else if (finding.type === 'file') {
-                        if (finding.item.isDirectory) {
-                            fixlistLines.push(`Folder: ${finding.item.path}`); fixlistLines.push(finding.item.path);
-                        } else {
-                            fixlistLines.push(finding.item.path);
+                    if (finding.type === 'attention' || finding.type === 'fallback') {
+                        let cmd = finding.line.replace(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2} - /, '').replace(/ <==== ATTENTION$/, '');
+                        cmd = cmd.replace(/^____[A-Z\s\(\)]+\s/, '').replace(/\s\[\d+.*\].*$/, '');
+                        if (cmd.match(/^[a-zA-Z]:\\/) && !cmd.includes('.')) cmd = `Folder: ${cmd}`;
+                        if (!processedItems.has(cmd) && !cmd.startsWith('=====')) {
+                            fixlistLines.push(cmd); processedItems.add(cmd);
                         }
+                    } else if (finding.type === 'task') {
+                        let cmd = `Task: {${finding.item.guid}} - System32\\Tasks\\${finding.item.name}`;
+                        if (!processedItems.has(cmd)) { fixlistLines.push(cmd); processedItems.add(cmd); }
+                    } else if (finding.type === 'file') {
+                        let cmd = finding.item.isDirectory ? `Folder: ${finding.item.path}` : finding.item.path;
+                        if (!processedItems.has(cmd)) { fixlistLines.push(cmd); processedItems.add(cmd); }
                     } else if (finding.type === 'registry') {
-                        fixlistLines.push(finding.item);
-                    } else if (finding.type === 'firewall') {
-                        fixlistLines.push(`FirewallRules: [{${finding.item.guid}}] => (${finding.item.action}) ${finding.item.filePath} => No File`);
-                    } else if (finding.type === 'ads') {
-                        fixlistLines.push(`AlternateDataStreams: ${finding.item.path}:${finding.item.stream} [${finding.item.size}]`);
+                        let cmd = finding.line;
+                        if (!processedItems.has(cmd)) { fixlistLines.push(cmd); processedItems.add(cmd); }
                     }
                 }
                 return fixlistLines;
@@ -770,13 +735,6 @@ End::</textarea>
         // ----------------------------------------------------------------------
         // DOM Workspace Controller Routine Scripts Block
         // ----------------------------------------------------------------------
-        function safeGetStorage(key, defaultVal) {
-            try { return JSON.parse(localStorage.getItem(key)) || defaultVal; } catch (e) { return defaultVal; }
-        }
-        function safeSetStorage(key, val) {
-            try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) { console.warn("Storage restricted."); }
-        }
-
         async function handleFileUpload() {
             const fileInput = document.getElementById('file-picker');
             const fileNameDisplay = document.getElementById('file-name');
@@ -848,7 +806,7 @@ End::</textarea>
 
         function runAutomatedThreatParser() {
             const rawContent = document.getElementById('log-input').value;
-            if (!rawContent) return alert("No log data loaded.");
+            if (!rawContent) return alert("No log data loaded into the workspace container mapping structure.");
 
             const engine = new FrstParser();
             engine.parseFrstContent(rawContent);
@@ -856,7 +814,6 @@ End::</textarea>
             const tbody = document.getElementById('threat-tbody');
             tbody.innerHTML = '';
 
-            // Render Findings sorted cleanly by descending weighted threat score
             const sortedFindings = [...engine.findings].sort((a, b) => b.score - a.score);
             sortedFindings.forEach(f => {
                 tbody.innerHTML += `<tr>
@@ -866,23 +823,11 @@ End::</textarea>
                 </tr>`;
             });
 
-            document.getElementById('summary-stats').innerHTML = `Total Identified Indicators Flagged: ${engine.findings.length}`;
+            document.getElementById('summary-stats').innerHTML = `Total Specific Identifiers Uncovered: ${engine.findings.length}`;
 
-            // Build Compiled Direct Fixlist Directives Area Block
             const fixlistCommands = engine.generateFixlist();
             
-            const cleanupCommands = [
-                'C:\\Windows\\System32\\GroupPolicy', 'C:\\Windows\\System32\\GroupPolicyUsers', '',
-                'StartPowershell:', '$Paths = (Get-MpPreference).ExclusionPath', '$Processes = (Get-MpPreference).ExclusionProcess',
-                'foreach ($Path in $Paths) { Remove-MpPreference -ExclusionPath $Path -Force -ErrorAction SilentlyContinue }',
-                'foreach ($Process in $Processes) { Remove-MpPreference -ExclusionProcess $Process -Force -ErrorAction SilentlyContinue }',
-                'Set-MpPreference -DisableRealtimeMonitoring $false', 'Set-MpPreference -DisableAntiSpyware $false',
-                'Set-MpPreference -DisableAntiVirus $false', 'Update-MpSignature', 'EndPowershell:', '',
-                'CMD: netsh int ip reset', 'CMD: netsh int ipv6 reset', 'CMD: ipconfig /flushdns', 'CMD: netsh winsock reset catalog', '',
-                'Hosts:', 'EmptyTemp:'
-            ];
-
-            const outputScript = `Start::\nCreateRestorePoint:\nCloseProcesses:\n\n${fixlistCommands.join('\n')}\n\n${cleanupCommands.join('\n')}\nEnd::`;
+            const outputScript = `Start::\nSystemRestore: On\nCreateRestorePoint:\nCloseProcesses:\n\n${fixlistCommands.join('\n')}\n\nEmptyTemp:\nHosts:\nEnd::`;
             document.getElementById('auto-fixlist-area').value = outputScript;
 
             openModal('auto-parse-modal');
@@ -896,7 +841,7 @@ End::</textarea>
             window.open(targetUrl, '_blank');
         }
 
-        // --- SINGLE-CLICK TO COPY HANDLER EVENT LISTENER ---
+        // --- SINGLE-CLICK TO COPY HANDLER ---
         const logDisplay = document.getElementById('log-display');
         logDisplay.addEventListener('click', function(e) {
             let targetDiv = e.target.closest('div[id^="log-L"]');
@@ -1028,7 +973,19 @@ End::</textarea>
             safeSetStorage('frst_helper_items', items); loadHelperEntries();
         }
 
-        function escapeHTML(str) { return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+        document.addEventListener('DOMContentLoaded', () => {
+            let yellowDb = safeGetStorage('frst_yellow_db', null);
+            let orangeDb = safeGetStorage('frst_orange_db', null);
+            if (!yellowDb && !orangeDb) {
+                safeSetStorage('frst_yellow_db', ["cmdll.vbs", "IsClosed.exe"]);
+                safeSetStorage('frst_orange_db', ["guiwallet.exe"]);
+            }
+        });
+
+        function escapeHTML(str) { 
+            if (!str) return '';
+            return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); 
+        }
     </script>
 </body>
 </html>
