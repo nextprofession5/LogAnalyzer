@@ -440,9 +440,7 @@ End::</textarea>
         const frstSections = ["processes", "registry", "scheduled tasks", "internet", "services", "drivers", "netsvcs", "one month (created)", "one month (modified)", "files in root", "sigcheck"];
         const additionSections = ["accounts", "security center", "installed programs", "packages", "custom clsid", "codecs", "shortcuts & wmi", "loaded modules", "alternate data streams", "safe mode", "association", "internet explorer", "hosts content", "network", "other areas", "msconfig", "firewallrules", "restore points", "faulty device manager", "event log errors", "memory info", "drives", "mbr & partition table"];
 
-        // ----------------------------------------------------------------------
-        // Integrated Pattern Library & Configuration Matrices
-        // ----------------------------------------------------------------------
+        // Pattern Matrix Storage Definition Maps
         const Patterns = {
             MD5_HASH: /^[a-fA-F0-9]{32}$/,
             SHA256_HASH: /^[a-fA-F0-9]{64}$/,
@@ -479,9 +477,7 @@ End::</textarea>
             return { base, ext, name };
         }
 
-        // ----------------------------------------------------------------------
-        // Class Structural Models Definition Space
-        // ----------------------------------------------------------------------
+        // Structural Classes Data Schemas Objects 
         class Task {
             constructor(guid, name, path, commandLine, author) {
                 this.guid = guid; this.name = name; this.path = path; this.commandLine = commandLine; this.author = author;
@@ -510,9 +506,7 @@ End::</textarea>
             }
         }
 
-        // ----------------------------------------------------------------------
-        // Threat Scoring Architecture Engine Logic
-        // ----------------------------------------------------------------------
+        // Dynamic Heuristic Weighted Verification Blocks
         class ThreatScorer {
             static scoreFile(fileEntry, correlations) {
                 let score = 0; const reasons = [];
@@ -539,7 +533,7 @@ End::</textarea>
                     }
                 }
                 if (Patterns.SUSPECT_EXT.test(extension)) { score += 15; reasons.push('Suspicious extension drop'); }
-                if (fileEntry.signature.includes('not signed')) { score += 5; reasons.push('Unsigned signature component'); }
+                if (fileEntry.signature && fileEntry.signature.includes('not signed')) { score += 5; reasons.push('Unsigned signature component'); }
 
                 if (correlations.hasTask) { score += 30; reasons.push(`Associated with persistent task hook`); }
                 if (correlations.hasRunEntry) { score += 25; reasons.push('Associated with auto-run registry configurations'); }
@@ -573,9 +567,7 @@ End::</textarea>
             }
         }
 
-        // ----------------------------------------------------------------------
-        // Smart Fallback-Resilient Parser Logic Framework
-        // ----------------------------------------------------------------------
+        // Resilient Client Side Analyzer Engine Object Controller
         class FrstParser {
             constructor() {
                 this.scan = { tasks: [], filesCreated: [], registryRun: [], registryPolicies: [], firewallRules: [] };
@@ -584,7 +576,7 @@ End::</textarea>
 
             parseFrstContent(content) {
                 const lines = content.split(/\r?\n/);
-                let currentSection = "Global Snippet Context";
+                let currentSection = "Global context snapshot environment logs runtime stream";
 
                 for (let i = 0; i < lines.length; i++) {
                     const line = lines[i];
@@ -592,20 +584,17 @@ End::</textarea>
                     const lowerLine = cleanLine.toLowerCase();
                     if (!cleanLine) continue;
 
-                    // Update section if headers are present, but don't limit parser if they are missing
                     if (cleanLine.startsWith('====================') && cleanLine.endsWith('====================')) {
                         currentSection = cleanLine.replace(/=/g, '').trim();
                         continue;
                     }
 
-                    // Strict exclusion instruction constraint: bypass orphaned targets matching No File
                     if (lowerLine.includes("=> no file") || lowerLine.includes("(no file)")) {
                         continue;
                     }
 
-                    // DYNAMIC SUB-ROUTINE TYPE DETECTION (FALLBACK BRAIN)
+                    // Direct tripwires handlers mapping logic structures
                     if (cleanLine.includes("<==== ATTENTION")) {
-                        // Immediate match profile on global warning strings
                         this.findings.push(new ThreatFinding(cleanLine, 85, ['Explicit log warning alert trace flagged'], 'attention', cleanLine));
                     }
 
@@ -616,7 +605,6 @@ End::</textarea>
                     } else if (/^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}\s+-/.test(cleanLine)) {
                         this.parseFileLine(cleanLine);
                     } else {
-                        // General loose string analytics checkpoint inspection
                         this.runLooseLineHeuristics(cleanLine);
                     }
                 }
@@ -652,14 +640,20 @@ End::</textarea>
                 }
             }
 
+            // Bulletproof file extraction matching split routines logic mapping
             parseFileLine(line) {
-                const match = line.match(/^(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2})\s+-\s+(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2})\s+-\s+(\d+)\s+([_\w\s\(\)]+)\s+(.*)$/);
-                if (match) {
-                    const fullPath = match[7].trim();
-                    const pathData = getBaseAndExt(fullPath);
-                    const sig = match[6] || "";
-                    const fileEntry = new FileEntry(fullPath, pathData.name, pathData.ext, parseInt(match[5], 10), `${match[1]} ${match[2]}`, `${match[3]} ${match[4]}`, sig, line.includes('____D'));
-                    this.scan.filesCreated.push(fileEntry);
+                const fileMatch = line.match(/^(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2})\s+-\s+(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2})\s+-\s+(\d+)\s+(.*)$/);
+                if (fileMatch) {
+                    let textBlock = fileMatch[4];
+                    let pathMatch = textBlock.match(/([a-zA-Z]:\\.*)$/);
+                    if (pathMatch) {
+                        let fullPath = pathMatch[1].trim();
+                        let sigInfo = textBlock.replace(fullPath, "").trim();
+                        let pathData = getBaseAndExt(fullPath);
+                        
+                        const fileEntry = new FileEntry(fullPath, pathData.name, pathData.ext, parseInt(fileMatch[3], 10), fileMatch[1], fileMatch[2], sigInfo, line.includes('____D'));
+                        this.scan.filesCreated.push(fileEntry);
+                    }
                 }
             }
 
@@ -668,7 +662,6 @@ End::</textarea>
                 let reasons = [];
                 let score = 0;
 
-                // Capture loose script drops anywhere inside volatile folder strings
                 if (Patterns.SUSPECT_EXT.test(lower) && (lower.includes('appdata') || lower.includes('temp') || lower.includes('public'))) {
                     score += 55; reasons.push('Script execution directive drop matched inside storage paths');
                 }
@@ -682,7 +675,6 @@ End::</textarea>
             }
 
             detectThreats() {
-                // Cross-inspect processed objects against database parameters
                 for (const task of this.scan.tasks) {
                     const correlations = { hasFile: this.scan.filesCreated.some(f => f.path.toLowerCase() === task.path.toLowerCase()) };
                     const { score, reasons } = ThreatScorer.scoreTask(task, correlations);
@@ -705,7 +697,6 @@ End::</textarea>
 
             generateFixlist() {
                 const fixlistLines = [];
-                // Filter out any duplicates to keep output completely clean
                 const processedItems = new Set();
                 const sorted = [...this.findings].sort((a, b) => b.score - a.score);
 
@@ -732,9 +723,7 @@ End::</textarea>
             }
         }
 
-        // ----------------------------------------------------------------------
-        // DOM Workspace Controller Routine Scripts Block
-        // ----------------------------------------------------------------------
+        // Unified workspace controller loops scripts
         async function handleFileUpload() {
             const fileInput = document.getElementById('file-picker');
             const fileNameDisplay = document.getElementById('file-name');
@@ -806,7 +795,7 @@ End::</textarea>
 
         function runAutomatedThreatParser() {
             const rawContent = document.getElementById('log-input').value;
-            if (!rawContent) return alert("No log data loaded into the workspace container mapping structure.");
+            if (!rawContent) return alert("No log data loaded inside container scope memory matrices mapping.");
 
             const engine = new FrstParser();
             engine.parseFrstContent(rawContent);
@@ -826,7 +815,6 @@ End::</textarea>
             document.getElementById('summary-stats').innerHTML = `Total Specific Identifiers Uncovered: ${engine.findings.length}`;
 
             const fixlistCommands = engine.generateFixlist();
-            
             const outputScript = `Start::\nSystemRestore: On\nCreateRestorePoint:\nCloseProcesses:\n\n${fixlistCommands.join('\n')}\n\nEmptyTemp:\nHosts:\nEnd::`;
             document.getElementById('auto-fixlist-area').value = outputScript;
 
@@ -841,7 +829,6 @@ End::</textarea>
             window.open(targetUrl, '_blank');
         }
 
-        // --- SINGLE-CLICK TO COPY HANDLER ---
         const logDisplay = document.getElementById('log-display');
         logDisplay.addEventListener('click', function(e) {
             let targetDiv = e.target.closest('div[id^="log-L"]');
