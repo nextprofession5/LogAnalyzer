@@ -3,14 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FRST Log Analyzer Pro v2.6 (Restored Workspace)</title>
+    <title>FRST Log Analyzer Pro</title>
     <style>
         :root {
             --bg-color: #1e1e1e;
             --text-color: #d4d4d4;
             --container-bg: #2d2d2d;
             --primary-color: #007acc;
-            --parse-color: #0056b3;
             --border-color: #444;
             --attention-color: #ff5555;
             --nofile-color: #00ff66;
@@ -131,7 +130,8 @@
             border-radius: 4px;
             font-size: 11px; 
             line-height: 1.4;
-            user-select: text;
+            user-select: none; 
+            -webkit-user-select: none;
         }
 
         #log-display div { 
@@ -145,8 +145,11 @@
             background-color: rgba(255,255,255,0.05);
         }
 
+        /* Flagging & Tracking Styles */
         .hl-attention { color: var(--attention-color) !important; font-weight: bold; }
         .hl-nofile { color: var(--nofile-color) !important; font-weight: bold; }
+        .hl-yellow { color: var(--yellow-flag) !important; font-weight: bold; background-color: rgba(255, 255, 0, 0.08); }
+        .hl-orange { color: var(--orange-flag) !important; font-weight: bold; background-color: rgba(255, 119, 0, 0.12); }
         .hl-copied { background-color: var(--copied-bg) !important; border-left: 3px solid var(--primary-color) !important; }
 
         .footer-nav {
@@ -177,7 +180,7 @@
             padding: 20px;
             border-radius: 8px;
             width: 95%;
-            max-width: 800px;
+            max-width: 450px;
             max-height: 85vh;
             overflow-y: auto;
             border: 1px solid var(--border-color);
@@ -217,7 +220,6 @@
             white-space: pre;
             overflow-x: auto;
             font-size: 11px;
-            font-family: monospace;
         }
 
         .helper-section {
@@ -249,6 +251,7 @@
         .db-tag {
             display: inline-block;
             background: #444;
+            color: var(--yellow-flag);
             padding: 4px 8px;
             border-radius: 4px;
             margin: 4px;
@@ -273,33 +276,11 @@
         }
 
         .parse-btn {
-            background-color: var(--parse-color);
+            background-color: #9b59b6;
             width: auto;
             padding: 6px 14px;
             margin-top: 0;
             font-size: 12px;
-        }
-
-        table.threat-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 10px;
-            font-size: 11px;
-        }
-        table.threat-table th, table.threat-table td {
-            border: 1px solid var(--border-color);
-            padding: 6px;
-            text-align: left;
-            vertical-align: top;
-        }
-        table.threat-table th { background: #222; }
-        .match-type-tag {
-            font-size: 10px;
-            background: #b33939;
-            color: #fff;
-            padding: 2px 5px;
-            border-radius: 3px;
-            font-weight: bold;
         }
     </style>
 </head>
@@ -327,7 +308,7 @@
         </div>
         <div class="utility-row">
             <input type="text" id="live-filter" placeholder="🔍 Filter log view..." oninput="filterLogView()">
-            <button class="parse-btn" id="master-parse-trigger" onclick="runPreciseParse()">⚡ Parse via JavaScript</button>
+            <button class="parse-btn" id="master-parse-trigger" onclick="runAutoParse()">⚡ Parse via Python</button>
         </div>
     </div>
 
@@ -340,24 +321,19 @@
     </div>
 
     <div id="auto-parse-modal" class="modal">
-        <div class="modal-content" style="max-width: 850px;">
+        <div class="modal-content">
             <span class="close-btn" onclick="closeModal('auto-parse-modal')">&times;</span>
-            <h2>⚡ Found Indicators List</h2>
-            <div id="summary-stats" style="margin-bottom: 12px; font-size: 12px; font-weight: bold; color: #ffda79;"></div>
+            <h2>⚡ Python Heuristic Analysis</h2>
             
-            <div style="overflow-y: auto; max-height: 250px; border: 1px solid var(--border-color); margin-bottom: 15px;">
-                <table class="threat-table">
-                    <thead>
-                        <tr><th style="width:140px;">Trigger Rule Match</th><th>Context Line Telemetry Record</th></tr>
-                    </thead>
-                    <tbody id="threat-tbody"></tbody>
-                </table>
-            </div>
+            <h3 style="color: var(--attention-color); margin-bottom: 5px; font-size: 14px;">⚠️ System Flags</h3>
+            <p style="font-size: 10px; margin-top: 0; color: #888;">All lines matching raw 'ATTENTION' indicators.</p>
+            <textarea id="parse-standard-area" class="output-box" style="height: 120px;"></textarea>
+            <button id="copy-standard-btn" class="btn-block" onclick="copyResults('parse-standard-area', 'copy-standard-btn')" style="margin-top: 5px;">Copy System Flags</button>
 
-            <h3 style="color: var(--orange-flag); margin-bottom: 5px; font-size: 13px;">📋 Auto-Compiled Script Workspace</h3>
-            <p style="font-size: 10px; margin-top: 0; color: #aaa;">Pre-compiled cleanup directives (Excludes "No File" entries and "Reboot:").</p>
-            <textarea id="auto-fixlist-area" class="output-box" style="height: 140px;" readonly></textarea>
-            <button id="copy-auto-fix-btn" class="btn-block" onclick="copyResults('auto-fixlist-area', 'copy-auto-fix-btn')" style="background-color: #e67e22;">Copy Script Commands</button>
+            <h3 style="color: var(--orange-flag); margin-bottom: 5px; margin-top: 20px; font-size: 14px;">🤖 Expert Matcher (Suspects Only)</h3>
+            <p style="font-size: 10px; margin-top: 0; color: #888;">Advanced Python Regex extraction. (Excludes 'No File' and 'ATTENTION')</p>
+            <textarea id="parse-sus-area" class="output-box" style="height: 120px;"></textarea>
+            <button id="copy-sus-btn" class="btn-block" onclick="copyResults('parse-sus-area', 'copy-sus-btn')" style="margin-top: 5px; background-color: var(--orange-flag);">Copy Suspects</button>
         </div>
     </div>
 
@@ -365,8 +341,8 @@
         <div class="modal-content">
             <span class="close-btn" onclick="closeModal('tools-modal')">&times;</span>
             <h2>Tools Extraction</h2>
-            <p>Type keywords to pull explicit telemetry matches manually.</p>
-            <input type="text" id="tool-instruction" placeholder="e.g., ATTENTION or Task:">
+            <p>Type exactly <b>No File</b> or <b>ATTENTION</b> to grab matching lines.</p>
+            <input type="text" id="tool-instruction" placeholder="No File / ATTENTION">
             <button class="btn-block" onclick="processInstruction()">Extract Lines</button>
         </div>
     </div>
@@ -383,7 +359,7 @@
     <div id="fixlist-modal" class="modal">
         <div class="modal-content">
             <span class="close-btn" onclick="closeModal('fixlist-modal')">&times;</span>
-            <h2>Fixlist Workspace</h2>
+            <h2>Fixlist</h2>
             <textarea id="fixlist-area" class="output-box" style="height: 240px;">Start::
 SystemRestore: On
 CreateRestorePoint:
@@ -432,7 +408,7 @@ End::</textarea>
                 <input type="text" id="helper-input-section" placeholder="e.g., Extra Commands">
                 <label><b>Saved Content:</b></label>
                 <textarea id="helper-input-text" class="form-control" style="height:70px;" placeholder="Paste text here..."></textarea>
-                <button class="btn-block" onclick="saveHelperEntry()">Save Snippet Entry</button>
+                <button class="btn-block" onclick="saveHelperEntry()">Save & Permanent Add</button>
             </div>
 
             <h3>Your Saved Sections</h3>
@@ -473,6 +449,15 @@ End::</textarea>
             fileNameDisplay.innerText = fileNames.join(', ');
             document.getElementById('log-input').value = combinedContent;
             renderLog();
+        }
+
+        function matchDatabaseKeyword(line, keyword) {
+            if (keyword.startsWith('/') && keyword.endsWith('/') && keyword.length > 2) {
+                try {
+                    return new RegExp(keyword.slice(1, -1), 'i').test(line);
+                } catch (e) { return false; }
+            }
+            return line.toLowerCase().includes(keyword.toLowerCase());
         }
 
         function renderLog() {
@@ -526,83 +511,36 @@ End::</textarea>
             document.getElementById('utility-bar').style.display = 'flex';
         }
 
-        // --- DIRECT SCAVENGING LOGIC CORE ---
-        function runPreciseParse() {
+        // --- WEBHOOK COMM LINK TO PYTHON API --- //
+        function runAutoParse() {
             const logData = document.getElementById('log-input').value;
-            if (!logData) return alert("Please load log data first.");
+            if (!logData) return alert("Please load a log file first.");
 
-            let lines = logData.split('\n');
-            let matchedThreatRecords = [];
-            let autoScriptCommandsOutput = [];
+            const parseBtn = document.getElementById('master-parse-trigger');
+            parseBtn.innerText = "⏳ Processing...";
+            parseBtn.disabled = true;
 
-            const regexHashFolder = /\\AppData\\(Local|Roaming)\\[a-f0-9]{32,64}\b/i;
-            const regexScriptsInAppData = /\\AppData\\.*\.(ps1|vbs|bat|cmd)\b/i;
+            const pythonServerUrl = "https://your-private-api.render.com/parse";
 
-            for (let line of lines) {
-                let cleanLine = line.trim();
-                let lowerLine = cleanLine.toLowerCase();
-                if (!cleanLine) continue;
-
-                // RULE: Completely skip over "No File" indicators entirely
-                if (lowerLine.includes("=> no file") || lowerLine.includes("(no file)")) {
-                    continue;
-                }
-
-                let matchLabel = "";
-
-                if (cleanLine.includes("<==== ATTENTION")) {
-                    matchLabel = "ATTENTION Flag";
-                } else if (regexHashFolder.test(cleanLine)) {
-                    matchLabel = "Hash Naming Pattern";
-                } else if (regexScriptsInAppData.test(cleanLine)) {
-                    matchLabel = "Script In AppData";
-                }
-
-                if (matchLabel !== "") {
-                    matchedThreatRecords.push({
-                        label: matchLabel,
-                        line: cleanLine
-                    });
-
-                    // Format pure cleanup script direct sequences
-                    let optimizedScriptLine = cleanLine;
-                    optimizedScriptLine = optimizedScriptLine.replace(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2} - /, '');
-                    optimizedScriptLine = optimizedScriptLine.replace(/ <==== ATTENTION$/, '');
-
-                    if (optimizedScriptLine.match(/^____[A-Z\s\(\)]+\s/)) {
-                        optimizedScriptLine = optimizedScriptLine.replace(/^____[A-Z\s\(\)]+\s/, '');
-                    }
-                    optimizedScriptLine = optimizedScriptLine.replace(/\s\[\d+.*\].*$/, '');
-
-                    let structuralFixCommand = optimizedScriptLine;
-                    if (structuralFixCommand.match(/^[a-zA-Z]:\\/) && !structuralFixCommand.includes('.')) {
-                        structuralFixCommand = `Folder: ${structuralFixCommand}`;
-                    }
-
-                    if (!autoScriptCommandsOutput.includes(structuralFixCommand) && !structuralFixCommand.startsWith('=====')) {
-                        autoScriptCommandsOutput.push(structuralFixCommand);
-                    }
-                }
-            }
-
-            // Render output inside table records panel
-            const tbodyEl = document.getElementById('threat-tbody');
-            tbodyEl.innerHTML = '';
-
-            matchedThreatRecords.forEach(record => {
-                tbodyEl.innerHTML += `<tr>
-                    <td><span class="match-type-tag">${record.label}</span></td>
-                    <td style="word-break:break-all; font-family:monospace; font-size:10px;">${escapeHTML(record.line)}</td>
-                </tr>`;
+            fetch(pythonServerUrl, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ log: logData })
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('parse-standard-area').value = data.system_flags;
+                document.getElementById('parse-sus-area').value = data.expert_suspects;
+                openModal('auto-parse-modal');
+            })
+            .catch(err => {
+                console.error("Connection failed:", err);
+                alert("Could not reach Python API server. Verify link architecture.");
+            })
+            .finally(() => {
+                parseBtn.innerText = "⚡ Parse via Python";
+                parseBtn.disabled = false;
             });
-
-            document.getElementById('summary-stats').innerHTML = `Total Specific Matches Found: ${matchedThreatRecords.length}`;
-
-            // Build Fixlist Text (Excludes Reboot:)
-            const compiledFixlistScript = `Start::\nSystemRestore: On\nCreateRestorePoint:\nCloseProcesses:\n\n${autoScriptCommandsOutput.join('\n')}\n\nEmptyTemp:\nHosts:\nEnd::`;
-            document.getElementById('auto-fixlist-area').value = compiledFixlistScript;
-
-            openModal('auto-parse-modal');
         }
 
         function runManualSearchQuery() {
@@ -614,23 +552,45 @@ End::</textarea>
             window.open(targetUrl, '_blank');
         }
 
-        // --- SINGLE-CLICK COPY REGISTER EVENT ROUTINES ---
+        // --- MOBILE HOLD-TO-COPY LOGIC --- //
+        let pressTimer;
+        let pressTargetIdx = -1;
         const logDisplay = document.getElementById('log-display');
-        logDisplay.addEventListener('click', function(e) {
+
+        function startLongPress(e) {
             let targetDiv = e.target.closest('div[id^="log-L"]');
             if (!targetDiv) return;
             
-            let idx = parseInt(targetDiv.id.replace('log-L', ''));
-            if(idx >= 0 && idx < currentLogLines.length) {
-                let rawText = currentLogLines[idx];
-                navigator.clipboard.writeText(rawText).then(() => {
-                    targetDiv.classList.add('hl-copied');
-                    const toast = document.getElementById('toast');
-                    toast.style.display = 'block';
-                    setTimeout(() => { toast.style.display = 'none'; }, 1000);
-                });
-            }
-        });
+            pressTargetIdx = parseInt(targetDiv.id.replace('log-L', ''));
+            pressTimer = setTimeout(() => {
+                copyLineToClipboard(pressTargetIdx);
+            }, 500); 
+        }
+
+        function cancelLongPress() {
+            clearTimeout(pressTimer);
+            pressTargetIdx = -1;
+        }
+
+        logDisplay.addEventListener('touchstart', startLongPress, {passive: true});
+        logDisplay.addEventListener('touchend', cancelLongPress);
+        logDisplay.addEventListener('touchmove', cancelLongPress, {passive: true}); 
+        logDisplay.addEventListener('mousedown', startLongPress);
+        logDisplay.addEventListener('mouseup', cancelLongPress);
+        logDisplay.addEventListener('mouseleave', cancelLongPress);
+
+        function copyLineToClipboard(index) {
+            cancelLongPress(); 
+            if(index < 0 || index >= currentLogLines.length) return;
+            
+            let rawText = currentLogLines[index];
+            navigator.clipboard.writeText(rawText).then(() => {
+                document.getElementById('log-L' + index).classList.add('hl-copied');
+                const toast = document.getElementById('toast');
+                toast.style.display = 'block';
+                setTimeout(() => { toast.style.display = 'none'; }, 1000);
+            });
+        }
 
         function jumpToSection() {
             const targetId = document.getElementById('section-jumper').value;
