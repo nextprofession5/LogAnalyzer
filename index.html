@@ -396,8 +396,16 @@ End::</textarea>
         const additionSections = ["accounts", "security center", "installed programs", "packages", "custom clsid", "codecs", "shortcuts & wmi", "loaded modules", "alternate data streams", "safe mode", "association", "internet explorer", "hosts content", "network", "other areas", "msconfig", "firewallrules", "restore points", "faulty device manager", "event log errors", "memory info", "drives", "mbr & partition table"];
 
         function safeGetStorage(key, defaultVal) {
-            try { return JSON.parse(localStorage.getItem(key)) || defaultVal; } catch (e) { return defaultVal; }
+            try {
+                let item = localStorage.getItem(key);
+                if (!item) return defaultVal;
+                let parsed = JSON.parse(item);
+                return Array.isArray(parsed) ? parsed.filter(t => typeof t === 'string') : defaultVal;
+            } catch (e) { 
+                return defaultVal; 
+            }
         }
+        
         function safeSetStorage(key, val) {
             try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) { console.warn("Storage restricted."); }
         }
@@ -429,7 +437,6 @@ End::</textarea>
             
             currentLogLines = rawText.split('\n');
             const displayEl = document.getElementById('log-display');
-            displayEl.innerHTML = ''; 
             
             const jumper = document.getElementById('section-jumper');
             jumper.innerHTML = '<option value="">-- Jump to Section --</option>';
@@ -439,14 +446,13 @@ End::</textarea>
             const additionGroup = document.createElement('optgroup');
             additionGroup.label = "─── Addition.txt Sections ───";
 
-            const fragment = document.createDocumentFragment();
-
             let yellowDb = safeGetStorage('frst_yellow_db', []);
             let orangeDb = safeGetStorage('frst_orange_db', []);
 
+            let htmlBuilder = [];
+
             currentLogLines.forEach((line, index) => {
-                const lineEl = document.createElement('div');
-                lineEl.id = `log-L${index}`;
+                let classes = [];
                 
                 if (line.startsWith('====================') && line.trim().endsWith('====================')) {
                     const cleanTitle = line.replace(/=/g, '').trim();
@@ -460,22 +466,23 @@ End::</textarea>
                     else frstGroup.appendChild(opt);
                 }
 
-                let safeLine = line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
                 let lowerLine = line.toLowerCase();
                 
-                if (line.includes('ATTENTION')) lineEl.classList.add('hl-attention');
-                else if (line.includes('No File')) lineEl.classList.add('hl-nofile');
-                else if (orangeDb.some(term => lowerLine.includes(term.toLowerCase()))) lineEl.classList.add('hl-orange');
-                else if (yellowDb.some(term => lowerLine.includes(term.toLowerCase()))) lineEl.classList.add('hl-yellow');
+                if (line.includes('ATTENTION')) classes.push('hl-attention');
+                else if (line.includes('No File')) classes.push('hl-nofile');
+                else if (orangeDb.length > 0 && orangeDb.some(term => term && lowerLine.includes(term.toLowerCase()))) classes.push('hl-orange');
+                else if (yellowDb.length > 0 && yellowDb.some(term => term && lowerLine.includes(term.toLowerCase()))) classes.push('hl-yellow');
 
-                lineEl.innerHTML = safeLine || '&nbsp;';
-                fragment.appendChild(lineEl);
+                let safeLine = escapeHTML(line);
+                let classAttr = classes.length > 0 ? ` class="${classes.join(' ')}"` : '';
+                
+                htmlBuilder.push(`<div id="log-L${index}"${classAttr}>${safeLine || '&nbsp;'}</div>`);
             });
             
             if (frstGroup.children.length > 0) jumper.appendChild(frstGroup);
             if (additionGroup.children.length > 0) jumper.appendChild(additionGroup);
 
-            displayEl.appendChild(fragment);
+            displayEl.innerHTML = htmlBuilder.join('');
             document.querySelector('.input-group').style.display = 'none'; 
             document.getElementById('utility-bar').style.display = 'flex';
         }
@@ -489,7 +496,6 @@ End::</textarea>
             window.open(targetUrl, '_blank');
         }
 
-        // --- SINGLE-CLICK TO COPY EVENT ---
         const logDisplay = document.getElementById('log-display');
         logDisplay.addEventListener('click', function(e) {
             let targetDiv = e.target.closest('div[id^="log-L"]');
@@ -505,161 +511,4 @@ End::</textarea>
                     setTimeout(() => { toast.style.display = 'none'; }, 1000);
                 });
             }
-        });
-
-        function jumpToSection() {
-            const targetId = document.getElementById('section-jumper').value;
-            if (!targetId = document.getElementById('section-jumper').value;
-            if (!targetId) return;
-            const targetEl = document.getElementById(targetId);
-            if (targetEl) targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
-
-        function filterLogView() {
-            const query = document.getElementById('live-filter').value.toLowerCase();
-            const lines = document.getElementById('log-display').getElementsByTagName('div');
-            for (let i = 0; i < lines.length; i++) {
-                if (lines[i].textContent.toLowerCase().includes(query)) lines[i].style.display = '';
-                else lines[i].style.display = 'none';
-            }
-        }
-
-        function clearFixlist() {
-            if(confirm("Reset fixlist container workspace back to default template layout?")) {
-                document.getElementById('fixlist-area').value = initialFixlistTemplate;
-            }
-        }
-
-        function downloadFixlist() {
-            const content = document.getElementById('fixlist-area').value;
-            const blob = new Blob([content], { type: 'text/plain' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'fixlist.txt';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-        }
-
-        function openModal(id) {
-            document.getElementById(id).style.display = 'flex';
-            if(id === 'tools-modal') document.getElementById('tool-instruction').focus();
-        }
-
-        function closeModal(id) {
-            document.getElementById(id).style.display = 'none';
-        }
-
-        function processInstruction() {
-            const instruction = document.getElementById('tool-instruction').value.trim();
-            if (!instruction) return;
-            let extractedLines = [];
-            for (let line of currentLogLines) {
-                if (line.includes(instruction)) extractedLines.push(line);
-            }
-            document.getElementById('results-area').value = extractedLines.join('\n');
-            closeModal('tools-modal');
-            openModal('results-modal');
-            document.getElementById('copy-btn').innerText = 'Copy All';
-        }
-
-        function copyResults(textareaId, buttonId) {
-            const resultsArea = document.getElementById(textareaId);
-            resultsArea.select();
-            resultsArea.setSelectionRange(0, 99999);
-            navigator.clipboard.writeText(resultsArea.value).then(() => {
-                document.getElementById(buttonId).innerText = 'Copied!';
-            });
-        }
-
-        function openHelperModal() {
-            loadHelperEntries();
-            renderDatabaseKeywords();
-            openModal('helper-modal');
-        }
-
-        function saveDatabaseKeyword(color) {
-            const inputEl = document.getElementById('db-keyword-input');
-            const keyword = inputEl.value.trim();
-            if(!keyword) return;
-
-            let storageKey = color === 'orange' ? 'frst_orange_db' : 'frst_yellow_db';
-            let db = safeGetStorage(storageKey, []);
-            
-            if(!db.includes(keyword)) {
-                db.push(keyword);
-                safeSetStorage(storageKey, db);
-            }
-            inputEl.value = '';
-            renderDatabaseKeywords();
-            if(currentLogLines.length > 0) renderLog();
-        }
-
-        function renderDatabaseKeywords() {
-            const holder = document.getElementById('db-keywords-holder');
-            let yellowDb = safeGetStorage('frst_yellow_db', []);
-            let orangeDb = safeGetStorage('frst_orange_db', []);
-            
-            if(yellowDb.length === 0 && orangeDb.length === 0) {
-                holder.innerHTML = '<p style="font-size:11px; color:#666; margin:0;">Databases empty.</p>';
-                return;
-            }
-            
-            let html = '';
-            yellowDb.forEach((k, idx) => { html += `<span class="db-tag db-tag-yellow">${escapeHTML(k)} <b style="color:red; cursor:pointer; margin-left:6px;" onclick="deleteDatabaseKeyword('yellow', ${idx})">&times;</b></span>`; });
-            orangeDb.forEach((k, idx) => { html += `<span class="db-tag db-tag-orange">${escapeHTML(k)} <b style="color:red; cursor:pointer; margin-left:6px;" onclick="deleteDatabaseKeyword('orange', ${idx})">&times;</b></span>`; });
-            holder.innerHTML = html;
-        }
-
-        function deleteDatabaseKeyword(color, index) {
-            let storageKey = color === 'orange' ? 'frst_orange_db' : 'frst_yellow_db';
-            let db = safeGetStorage(storageKey, []);
-            db.splice(index, 1);
-            safeSetStorage(storageKey, db);
-            renderDatabaseKeywords();
-            if(currentLogLines.length > 0) renderLog();
-        }
-
-        function saveHelperEntry() {
-            const sectionTitle = document.getElementById('helper-input-section').value.trim() || 'General Snippet';
-            const textValue = document.getElementById('helper-input-text').value.trim();
-            if (!textValue) return;
-
-            let items = safeGetStorage('frst_helper_items', []);
-            items.push({ id: Date.now(), section: sectionTitle, content: textValue });
-            safeSetStorage('frst_helper_items', items);
-            
-            document.getElementById('helper-input-section').value = '';
-            document.getElementById('helper-input-text').value = '';
-            loadHelperEntries();
-        }
-
-        function loadHelperEntries() {
-            const displayBox = document.getElementById('helper-saved-list');
-            let items = safeGetStorage('frst_helper_items', []);
-            if(items.length === 0) {
-                displayBox.innerHTML = '<p style="color:#666; font-style:italic;">No saved snippets.</p>';
-                return;
-            }
-            let html = '';
-            items.forEach(item => {
-                html += `<div class="helper-section"><div class="helper-title"><span>📂 ${escapeHTML(item.section)}</span><span class="delete-btn" onclick="deleteHelperEntry(${item.id})">❌ Delete</span></div><div class="helper-body" onclick="document.execCommand('copy')">${escapeHTML(item.content)}</div></div>`;
-            });
-            displayBox.innerHTML = html;
-        }
-
-        function deleteHelperEntry(id) {
-            let items = safeGetStorage('frst_helper_items', []);
-            items = items.filter(item => item.id !== id);
-            safeSetStorage('frst_helper_items', items);
-            loadHelperEntries();
-        }
-
-        function escapeHTML(str) {
-            return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-        }
-    </script>
-</body>
-</html>
+    
