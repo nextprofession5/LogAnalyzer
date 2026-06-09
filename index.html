@@ -2,744 +2,699 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=yes">
-    <title>FRST Forensic Analyzer</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FRST Log Analyzer Pro</title>
     <style>
-        * {
-            box-sizing: border-box;
-            -webkit-tap-highlight-color: transparent;
+        :root {
+            --bg-color: #1e1e1e;
+            --text-color: #d4d4d4;
+            --container-bg: #2d2d2d;
+            --primary-color: #007acc;
+            --border-color: #444;
+            --attention-color: #ff5555;
+            --nofile-color: #00ff66;
+            --yellow-flag: #ffff00;
+            --orange-flag: #ff7700;
+            --copied-bg: rgba(255, 255, 255, 0.15);
         }
 
         body {
-            font-family: 'SF Mono', 'Monaco', 'Cascadia Code', 'Consolas', monospace;
-            background: #0a0e17;
-            color: #e2e8f0;
+            font-family: 'Courier New', Courier, monospace;
             margin: 0;
-            padding: 0 0 80px 0;
-            font-size: 11px;
-            line-height: 1.4;
+            padding: 4px; 
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-size: 11px; 
+            padding-bottom: 80px;
         }
 
-        .app-container {
-            max-width: 100%;
-            padding: 12px 10px 20px 10px;
-        }
-
-        .section-header {
-            background: #1e2a3a;
-            padding: 8px 12px;
-            border-radius: 10px;
-            margin: 16px 0 12px 0;
-            font-weight: bold;
-            font-size: 13px;
-            border-left: 4px solid #3b82f6;
-        }
-
-        .upload-zone {
-            background: #0f1724;
-            border: 2px dashed #334155;
-            border-radius: 20px;
-            padding: 20px 12px;
-            text-align: center;
-            margin-bottom: 20px;
-        }
-        .upload-zone.drag-over {
-            border-color: #3b82f6;
-            background: #1e293b;
-        }
-        .upload-label, .paste-btn {
-            display: inline-block;
-            background: #3b82f6;
-            color: white;
-            padding: 10px 20px;
-            border-radius: 40px;
-            font-size: 13px;
-            font-weight: bold;
-            margin: 8px 5px;
-            cursor: pointer;
-        }
-        .paste-btn {
-            background: #475569;
-        }
-        .upload-label input {
-            display: none;
-        }
-
-        .filter-bar {
-            position: sticky;
-            top: 0;
-            background: #0a0e17;
-            z-index: 100;
-            padding: 10px 0;
-            display: flex;
-            gap: 8px;
-            flex-wrap: wrap;
-        }
-        .filter-input {
-            flex: 1;
-            background: #1e293b;
-            border: 1px solid #334155;
-            color: #f1f5f9;
-            padding: 12px 14px;
-            border-radius: 40px;
-            font-size: 13px;
-            font-family: inherit;
-        }
-        .filter-input:focus {
-            outline: none;
-            border-color: #3b82f6;
-        }
-
-        .log-container {
-            background: #0f1724;
-            border-radius: 16px;
-            padding: 8px 0;
-            margin-top: 8px;
-            overflow-x: hidden;
-            word-break: break-word;
-        }
-        .log-line {
-            padding: 6px 12px;
-            border-bottom: 1px solid #1e293b;
-            font-family: monospace;
-            font-size: 11px;
-            white-space: pre-wrap;
-            word-break: break-all;
-            cursor: pointer;
-            transition: background 0.1s;
-        }
-        .log-line:active {
-            background: #2d3a4e;
-        }
-        .log-line.copied {
-            background: #2a3a5e;
-        }
-        .attention {
-            color: #f87171;
-            font-weight: bold;
-        }
-        .nofile {
-            color: #4ade80;
-        }
-        .custom-highlight {
-            background-color: #854d0e;
-            color: #fde047;
+        .input-group {
+            background: var(--container-bg);
+            padding: 8px;
             border-radius: 4px;
-            padding: 0 2px;
+            border: 1px solid var(--border-color);
+            margin-bottom: 10px;
         }
-        .filter-hidden {
+
+        textarea#log-input {
+            width: 100%;
+            height: 80px;
+            background: #111;
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+            padding: 8px;
+            box-sizing: border-box;
+            border-radius: 4px;
+            resize: vertical;
+        }
+
+        .file-input-wrapper {
+            margin-top: 8px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        input[type="file"] {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0,0,0,0);
+            border: 0;
+        }
+
+        .custom-file-upload {
+            background: #444;
+            padding: 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            display: inline-block;
+            border: 1px solid var(--border-color);
+        }
+
+        #utility-bar {
             display: none;
+            background: var(--container-bg);
+            padding: 6px;
+            margin-bottom: 8px;
+            border-radius: 4px;
+            border: 1px solid var(--border-color);
+            flex-direction: column;
+            gap: 6px;
         }
+        
+        .utility-row {
+            display: flex;
+            gap: 6px;
+            width: 100%;
+        }
+
+        #utility-bar select, #utility-bar input {
+            flex: 1;
+            background: #111;
+            color: white;
+            border: 1px solid var(--border-color);
+            padding: 6px;
+            border-radius: 4px;
+            font-size: 11px;
+            min-width: 0;
+        }
+
+        button {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 16px;
+        }
+
+        button:active { opacity: 0.8; }
+        .btn-block { width: 100%; margin-top: 10px; }
+
+        #log-display {
+            background: var(--container-bg);
+            border: 1px solid var(--border-color);
+            padding: 6px; 
+            white-space: pre; 
+            overflow-x: auto; 
+            min-height: 60vh;
+            width: 100%;
+            box-sizing: border-box;
+            border-radius: 4px;
+            font-size: 11px; 
+            line-height: 1.4;
+            user-select: none; 
+            -webkit-user-select: none;
+        }
+
+        #log-display div { 
+            padding: 2px 4px; 
+            cursor: pointer;
+            border-left: 3px solid transparent;
+            transition: background-color 0.2s, border-color 0.2s;
+        }
+
+        #log-display div:active {
+            background-color: rgba(255,255,255,0.05);
+        }
+
+        /* Flagging & Tracking Styles */
+        .hl-attention { color: var(--attention-color) !important; font-weight: bold; }
+        .hl-nofile { color: var(--nofile-color) !important; font-weight: bold; }
+        .hl-yellow { color: var(--yellow-flag) !important; font-weight: bold; background-color: rgba(255, 255, 0, 0.08); }
+        .hl-orange { color: var(--orange-flag) !important; font-weight: bold; background-color: rgba(255, 119, 0, 0.12); }
+        .hl-copied { background-color: var(--copied-bg) !important; border-left: 3px solid var(--primary-color) !important; }
 
         .footer-nav {
             position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            background: #0f1724;
-            border-top: 1px solid #1e293b;
+            bottom: 0; left: 0; right: 0;
+            background: #111;
+            padding: 10px;
             display: flex;
-            justify-content: space-around;
-            padding: 6px 4px 10px 4px;
-            z-index: 200;
-            backdrop-filter: blur(12px);
-            background: rgba(15, 23, 36, 0.95);
+            gap: 6px;
+            box-shadow: 0 -4px 10px rgba(0,0,0,0.5);
+            z-index: 100;
         }
-        .nav-btn {
-            flex: 1;
-            text-align: center;
-            padding: 8px 4px;
-            background: transparent;
-            border: none;
-            color: #94a3b8;
-            font-size: 11px;
-            font-weight: 500;
-            border-radius: 30px;
-        }
-        .nav-btn.active {
-            color: #3b82f6;
-            background: #1e293b;
-        }
-
-        .panel {
-            display: none;
-        }
-        .panel.active-panel {
-            display: block;
-        }
-
-        .jump-menu {
-            background: #1e293b;
-            border-radius: 30px;
-            padding: 8px 12px;
-            margin-bottom: 16px;
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-            max-height: 100px;
-            overflow-y: auto;
-        }
-        .jump-item {
-            background: #334155;
-            padding: 5px 12px;
-            border-radius: 30px;
-            font-size: 10px;
-            color: #e2e8f0;
-            text-decoration: none;
-            white-space: nowrap;
-        }
+        .footer-nav button { flex: 1; margin: 0; font-size: 13px; padding: 10px 4px; }
 
         .modal {
+            display: none;
             position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0,0,0,0.85);
-            z-index: 1000;
-            display: flex;
-            align-items: center;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8);
+            z-index: 200;
             justify-content: center;
-            padding: 16px;
+            align-items: center;
         }
+
         .modal-content {
-            background: #0f1724;
-            border-radius: 24px;
+            background: var(--bg-color);
+            padding: 20px;
+            border-radius: 8px;
             width: 95%;
-            max-width: 600px;
+            max-width: 450px;
             max-height: 85vh;
             overflow-y: auto;
-            padding: 20px;
-            border: 1px solid #334155;
+            border: 1px solid var(--border-color);
+            position: relative;
+            box-sizing: border-box;
         }
-        textarea, input {
+
+        .close-btn {
+            position: absolute;
+            top: 10px; right: 15px;
+            font-size: 28px;
+            cursor: pointer;
+            color: #aaa;
+            font-family: sans-serif;
+        }
+
+        input[type="text"], textarea.form-control {
             width: 100%;
-            background: #1e293b;
-            border: 1px solid #475569;
-            color: #e2e8f0;
-            font-family: monospace;
-            font-size: 11px;
             padding: 12px;
-            border-radius: 12px;
+            background: var(--container-bg);
+            color: white;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            box-sizing: border-box;
+            font-size: 16px;
+            margin-top: 8px;
             margin-bottom: 12px;
         }
-        button {
-            background: #3b82f6;
-            border: none;
+
+        textarea.output-box {
+            width: 100%;
+            height: 240px;
+            background: var(--container-bg);
             color: white;
-            padding: 10px 16px;
-            border-radius: 40px;
+            border: 1px solid var(--border-color);
+            padding: 8px;
+            box-sizing: border-box;
+            white-space: pre;
+            overflow-x: auto;
+            font-size: 11px;
+        }
+
+        .helper-section {
+            border: 1px solid #444;
+            background: #252525;
+            padding: 10px;
+            margin-bottom: 12px;
+            border-radius: 4px;
+        }
+        .helper-title {
             font-weight: bold;
-            font-size: 13px;
-            margin: 4px;
-            cursor: pointer;
-        }
-        button.secondary {
-            background: #475569;
-        }
-        .flex-between {
+            color: var(--primary-color);
+            margin-bottom: 5px;
             display: flex;
             justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 8px;
+            font-size: 13px;
         }
-        .badge {
-            background: #1e293b;
-            padding: 4px 8px;
-            border-radius: 30px;
-            font-size: 10px;
-        }
-        .toast {
-            position: fixed;
-            bottom: 70px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: #1e293b;
-            color: #4ade80;
-            padding: 6px 16px;
-            border-radius: 50px;
+        .helper-body {
+            white-space: pre-wrap;
+            background: #111;
+            padding: 8px;
+            border-radius: 4px;
             font-size: 12px;
-            z-index: 1000;
-            pointer-events: none;
-            white-space: nowrap;
+            word-break: break-all;
+            user-select: all;
+        }
+        .delete-btn { color: #ff5555; cursor: pointer; font-size: 12px; }
+        
+        .db-tag {
+            display: inline-block;
+            background: #444;
+            padding: 4px 8px;
+            border-radius: 4px;
+            margin: 4px;
+            font-size: 11px;
+        }
+        .db-tag-orange { color: var(--orange-flag); border: 1px solid var(--orange-flag); }
+        .db-tag-yellow { color: var(--yellow-flag); border: 1px solid var(--yellow-flag); }
+        
+        #toast {
+            display: none;
+            position: fixed;
+            top: 20px; left: 50%;
+            transform: translateX(-50%);
+            background: var(--primary-color);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-weight: bold;
+            z-index: 300;
+            font-size: 13px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.5);
         }
     </style>
 </head>
 <body>
 
-<div class="app-container" id="app">
-    <div class="flex-between">
-        <h2 style="margin:0">🕵️ FRST Analyzer</h2>
-        <span class="badge" id="statsBadge">No log</span>
-    </div>
+    <div id="toast">Copied to clipboard!</div>
 
-    <div class="filter-bar">
-        <input type="text" id="liveFilter" class="filter-input" placeholder="🔍 Filter lines...">
-    </div>
-
-    <!-- Jump menu (populated dynamically) -->
-    <div id="jumpMenu" class="jump-menu"></div>
-
-    <!-- Panels (Log, Extractor, Fixlist, Settings) -->
-    <div id="logPanel" class="panel active-panel">
-        <div class="upload-zone" id="uploadZone">
-            <div>📂 Drag & drop FRST logs or</div>
-            <label class="upload-label">📁 Choose files<input type="file" id="fileInput" multiple accept=".txt,.log"></label>
-            <button id="pasteModalBtn" class="secondary">📋 Paste raw log</button>
+    <div class="input-group">
+        <textarea id="log-input" placeholder="Paste FRST log here..."></textarea>
+        <div class="file-input-wrapper">
+            <label class="custom-file-upload">
+                <input type="file" id="file-picker" accept=".txt" multiple onchange="handleFileUpload()">
+                📁 Upload Logs
+            </label>
+            <span id="file-name" style="font-size:12px; color:#888;">No file selected</span>
         </div>
-        <div id="logContainer" class="log-container">← Upload or paste a log</div>
+        <button class="btn-block" onclick="renderLog()">Process & Load Log</button>
     </div>
 
-    <div id="extractorPanel" class="panel">
-        <div class="section-header">📎 Keyword Extractor</div>
-        <input type="text" id="extractKeyword" placeholder="Enter keyword (e.g. .exe, ATTENTION, No File)">
-        <button id="runExtract">Extract lines</button>
-        <div class="section-header">📄 Extraction Output</div>
-        <textarea id="extractOutput" rows="8" readonly placeholder="Extracted lines will appear here..."></textarea>
-        <button id="copyExtract" class="secondary">Copy output</button>
+    <div id="utility-bar">
+        <div class="utility-row">
+            <select id="section-jumper" onchange="jumpToSection()">
+                <option value="">-- Jump to Section --</option>
+            </select>
+        </div>
+        <div class="utility-row">
+            <input type="text" id="live-filter" placeholder="🔍 Filter log view..." oninput="filterLogView()">
+        </div>
     </div>
 
-    <div id="fixlistPanel" class="panel">
-        <div class="section-header">📝 Fixlist Scratchpad</div>
-        <textarea id="fixlistEditor" rows="12">Start::
+    <div id="log-display">Log data will render here...</div>
+
+    <div class="footer-nav">
+        <button onclick="openModal('tools-modal')">🛠️ Tools</button>
+        <button style="background-color: #e67e22;" onclick="openModal('fixlist-modal')">📝 View Fixlist</button>
+        <button style="background-color: #2b8a3e;" onclick="openHelperModal()">📋 Helper GUI</button>
+    </div>
+
+    <div id="tools-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn" onclick="closeModal('tools-modal')">&times;</span>
+            <h2>Tools Extraction</h2>
+            <p>Type exactly <b>No File</b> or <b>ATTENTION</b> to grab matching lines.</p>
+            <input type="text" id="tool-instruction" placeholder="No File / ATTENTION">
+            <button class="btn-block" onclick="processInstruction()">Extract Lines</button>
+        </div>
+    </div>
+
+    <div id="results-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn" onclick="closeModal('results-modal')">&times;</span>
+            <h2>Extracted Results</h2>
+            <textarea id="results-area" class="output-box" readonly></textarea>
+            <button id="copy-btn" class="btn-block" onclick="copyResults('results-area', 'copy-btn')">Copy All</button>
+        </div>
+    </div>
+
+    <div id="fixlist-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn" onclick="closeModal('fixlist-modal')">&times;</span>
+            <h2>Fixlist</h2>
+            <textarea id="fixlist-area" class="output-box">Start::
+SystemRestore: On
 CreateRestorePoint:
 CloseProcesses:
 
-Hosts:
 EmptyTemp:
+Hosts:
 End::</textarea>
-        <div class="flex-between">
-            <button id="exportFixlist">⬇️ Export fixlist.txt</button>
-            <button id="copyFixlist" class="secondary">📋 Copy</button>
+            
+            <div style="display: flex; gap: 10px; margin-top: 10px;">
+                <button id="copy-fix-btn" style="flex: 1; background-color:#e67e22;" onclick="copyResults('fixlist-area', 'copy-fix-btn')">Copy</button>
+                <button style="flex: 1; background-color:#2980b9;" onclick="downloadFixlist()">💾 Save .txt</button>
+            </div>
+            
+            <button class="btn-block" style="background-color:#555; margin-top:10px;" onclick="clearFixlist()">Reset Template</button>
         </div>
-        <div class="section-header" style="margin-top:16px">➕ Add selected log line</div>
-        <p style="font-size:10px">Tap any line in the Log panel → adds to fixlist</p>
     </div>
 
-    <div id="settingsPanel" class="panel">
-        <div class="section-header">🎨 Custom Highlights</div>
-        <p>Add keywords (case-insensitive) to highlight in yellow/orange:</p>
-        <input type="text" id="newCustomKeyword" placeholder="e.g. malware.exe, suspicious">
-        <button id="addCustomKeyword">Add keyword</button>
-        <div id="customKeywordsList" style="margin-top:12px"></div>
-        <button id="clearCustomKeywords" class="secondary">Clear all custom keywords</button>
-        <hr>
-        <div class="section-header">🛡️ VirusTotal Lookup</div>
-        <p>Paste a file hash (MD5/SHA1/SHA256) or upload a suspicious file:</p>
-        <input type="text" id="vtHash" placeholder="MD5 / SHA256 hash">
-        <button id="vtHashBtn">Check hash</button>
-        <div style="margin-top:8px">
-            <input type="file" id="vtFileUpload" accept="*/*">
-            <button id="vtFileBtn">Upload file to VirusTotal</button>
+    <div id="helper-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn" onclick="closeModal('helper-modal')">&times;</span>
+            
+            <h2>File Verification Lookup</h2>
+            <div style="border: 1px dashed var(--primary-color); padding: 10px; margin-bottom: 20px; border-radius:4px;">
+                <label><b>Query File Name or Process:</b></label>
+                <input type="text" id="lookup-filename-input" placeholder="e.g., svchost.exe or badfile.sys">
+                <button class="btn-block" style="background-color: var(--primary-color);" onclick="runExternalFileLookup()">Search File.net Reputation</button>
+            </div>
+
+            <h2>Flagging Databases</h2>
+            <div style="border: 1px dashed #666; padding: 10px; margin-bottom: 20px; border-radius:4px;">
+                <label><b>Enter Path, Keyword, or Regex:</b></label>
+                <input type="text" id="db-keyword-input" placeholder="e.g., AppData\Local\RenPy">
+                
+                <div style="display:flex; gap:10px; margin-top:5px;">
+                    <button style="flex:1; background-color: #f39c12; font-size:13px; padding:10px;" onclick="saveDatabaseKeyword('yellow')">Flag Yellow</button>
+                    <button style="flex:1; background-color: #d35400; font-size:13px; padding:10px;" onclick="saveDatabaseKeyword('orange')">Flag Orange 🌟</button>
+                </div>
+                
+                <div id="db-keywords-holder" style="margin-top:15px;"></div>
+            </div>
+
+            <h2>Helper Notes Storage</h2>
+            <div style="border: 1px dashed #555; padding: 10px; margin-bottom: 15px; border-radius:4px;">
+                <label><b>Section Title:</b></label>
+                <input type="text" id="helper-input-section" placeholder="e.g., Extra Commands">
+                <label><b>Saved Content:</b></label>
+                <textarea id="helper-input-text" class="form-control" style="height:70px;" placeholder="Paste text here..."></textarea>
+                <button class="btn-block" onclick="saveHelperEntry()">Save & Permanent Add</button>
+            </div>
+
+            <h3>Your Saved Sections</h3>
+            <div id="helper-saved-list"></div>
         </div>
-        <div id="vtResult" style="background:#0f1724; border-radius:12px; padding:12px; margin-top:12px; font-size:10px; word-break:break-all"></div>
-        <p style="font-size:9px; color:#64748b">Note: VirusTotal requires an API key (free). Set it below.</p>
-        <input type="text" id="vtApiKey" placeholder="VirusTotal API key (optional)">
-        <button id="saveApiKey" class="secondary">Save key</button>
     </div>
 
-    <!-- Mobile bottom navigation -->
-    <div class="footer-nav">
-        <button class="nav-btn active" data-panel="logPanel">📄 Log</button>
-        <button class="nav-btn" data-panel="extractorPanel">🔍 Extract</button>
-        <button class="nav-btn" data-panel="fixlistPanel">📝 Fixlist</button>
-        <button class="nav-btn" data-panel="settingsPanel">⚙️ Tools</button>
-    </div>
-</div>
+    <script>
+        let currentLogLines = [];
+        const initialFixlistTemplate = `Start::\nSystemRestore: On\nCreateRestorePoint:\nCloseProcesses:\n\nEmptyTemp:\nHosts:\nEnd::`;
 
-<script>
-    // ---------- State ----------
-    let rawLogText = "";
-    let parsedLines = [];
-    let currentFilter = "";
-    let customKeywords = JSON.parse(localStorage.getItem("frst_custom_keywords") || "[]");
-    let vtApiKey = localStorage.getItem("vt_api_key") || "";
+        const frstSections = ["processes", "registry", "scheduled tasks", "internet", "services", "drivers", "netsvcs", "one month (created)", "one month (modified)", "files in root", "sigcheck"];
+        const additionSections = ["accounts", "security center", "installed programs", "packages", "custom clsid", "codecs", "shortcuts & wmi", "loaded modules", "alternate data streams", "safe mode", "association", "internet explorer", "hosts content", "network", "other areas", "msconfig", "firewallrules", "restore points", "faulty device manager", "event log errors", "memory info", "drives", "mbr & partition table"];
 
-    // DOM elements
-    const logContainer = document.getElementById("logContainer");
-    const liveFilter = document.getElementById("liveFilter");
-    const jumpMenu = document.getElementById("jumpMenu");
-    const statsBadge = document.getElementById("statsBadge");
-    const fileInput = document.getElementById("fileInput");
-    const uploadZone = document.getElementById("uploadZone");
-    const extractKeyword = document.getElementById("extractKeyword");
-    const runExtract = document.getElementById("runExtract");
-    const extractOutput = document.getElementById("extractOutput");
-    const copyExtract = document.getElementById("copyExtract");
-    const fixlistEditor = document.getElementById("fixlistEditor");
-    const exportFixlist = document.getElementById("exportFixlist");
-    const copyFixlist = document.getElementById("copyFixlist");
-    const newCustomKeyword = document.getElementById("newCustomKeyword");
-    const addCustomKeyword = document.getElementById("addCustomKeyword");
-    const customKeywordsList = document.getElementById("customKeywordsList");
-    const clearCustomKeywords = document.getElementById("clearCustomKeywords");
-    const vtHash = document.getElementById("vtHash");
-    const vtHashBtn = document.getElementById("vtHashBtn");
-    const vtFileUpload = document.getElementById("vtFileUpload");
-    const vtFileBtn = document.getElementById("vtFileBtn");
-    const vtResult = document.getElementById("vtResult");
-    const vtApiKeyInput = document.getElementById("vtApiKey");
-    const saveApiKey = document.getElementById("saveApiKey");
-    const pasteModalBtn = document.getElementById("pasteModalBtn");
-
-    // Helper: show toast
-    function showToast(msg, duration = 1500) {
-        let toast = document.querySelector(".toast");
-        if (!toast) {
-            toast = document.createElement("div");
-            toast.className = "toast";
-            document.body.appendChild(toast);
+        function safeGetStorage(key, defaultVal) {
+            try { return JSON.parse(localStorage.getItem(key)) || defaultVal; } catch (e) { return defaultVal; }
         }
-        toast.textContent = msg;
-        toast.style.opacity = "1";
-        setTimeout(() => { toast.style.opacity = "0"; }, duration);
-    }
-
-    // Render log lines with highlighting and filtering
-    function renderLog() {
-        if (!rawLogText) {
-            logContainer.innerHTML = "← Upload or paste a log";
-            statsBadge.textContent = "No log";
-            jumpMenu.innerHTML = "";
-            return;
+        function safeSetStorage(key, val) {
+            try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) { console.warn("Storage restricted."); }
         }
-        const lines = rawLogText.split(/\r?\n/);
-        let html = "";
-        let visibleCount = 0;
-        for (let i = 0; i < lines.length; i++) {
-            let line = lines[i];
-            let displayLine = escapeHtml(line);
-            let isHidden = false;
-            if (currentFilter && !line.toLowerCase().includes(currentFilter.toLowerCase())) {
-                isHidden = true;
-            } else {
-                visibleCount++;
+
+        async function handleFileUpload() {
+            const fileInput = document.getElementById('file-picker');
+            const fileNameDisplay = document.getElementById('file-name');
+            if (fileInput.files.length === 0) return;
+            
+            let fileNames = [];
+            let combinedContent = "";
+
+            for (let i = 0; i < fileInput.files.length; i++) {
+                let file = fileInput.files[i];
+                fileNames.push(file.name);
+                let text = await file.text();
+                if(i > 0) combinedContent += `\n==================== End of Previous Log ====================\n\n`;
+                combinedContent += text + "\n";
             }
-            // Apply highlighting
-            let hasAttention = line.includes("ATTENTION");
-            let hasNoFile = line.includes("No File");
-            if (hasAttention) displayLine = `<span class="attention">${displayLine}</span>`;
-            if (hasNoFile) displayLine = `<span class="nofile">${displayLine}</span>`;
-            // Custom keywords
-            for (let kw of customKeywords) {
-                if (kw && line.toLowerCase().includes(kw.toLowerCase())) {
-                    const regex = new RegExp(`(${escapeRegex(kw)})`, 'gi');
-                    displayLine = displayLine.replace(regex, `<span class="custom-highlight">$1</span>`);
-                }
-            }
-            const hiddenClass = isHidden ? "filter-hidden" : "";
-            html += `<div class="log-line ${hiddenClass}" data-line-index="${i}" data-raw="${escapeHtml(line).replace(/"/g, '&quot;')}">${displayLine}</div>`;
-        }
-        logContainer.innerHTML = html;
-        statsBadge.textContent = `${visibleCount} lines (${lines.length} total)`;
 
-        // Add click handlers for line copy & add to fixlist
-        document.querySelectorAll(".log-line").forEach(el => {
-            el.addEventListener("click", (e) => {
-                e.stopPropagation();
-                const raw = el.getAttribute("data-raw");
-                if (raw) {
-                    navigator.clipboard.writeText(raw).then(() => {
-                        showToast("📋 Line copied");
-                        el.classList.add("copied");
-                        setTimeout(() => el.classList.remove("copied"), 500);
-                    });
-                    // Also append to fixlist if fixlist panel is active? We'll provide a button? But user requested tap to copy only. 
-                    // However they also asked "add selected log line" to fixlist via a button in fixlist panel. We'll implement that.
-                }
-            });
-        });
-        buildJumpMenu(lines);
-    }
-
-    function buildJumpMenu(lines) {
-        const sectionRegex = /^={20,}\s*(.+?)\s*={20,}$/;
-        const sections = [];
-        for (let i = 0; i < lines.length; i++) {
-            const match = lines[i].match(sectionRegex);
-            if (match) {
-                sections.push({ name: match[1].trim(), index: i });
-            }
-        }
-        if (sections.length === 0) {
-            jumpMenu.innerHTML = "<span style='font-size:10px'>No sections detected</span>";
-            return;
-        }
-        let html = "";
-        for (let sec of sections) {
-            html += `<a href="#" class="jump-item" data-index="${sec.index}">📌 ${sec.name.substring(0, 30)}</a>`;
-        }
-        jumpMenu.innerHTML = html;
-        document.querySelectorAll(".jump-item").forEach(link => {
-            link.addEventListener("click", (e) => {
-                e.preventDefault();
-                const idx = parseInt(link.getAttribute("data-index"));
-                const targetLine = document.querySelector(`.log-line[data-line-index="${idx}"]`);
-                if (targetLine) {
-                    targetLine.scrollIntoView({ behavior: "smooth", block: "start" });
-                    targetLine.style.backgroundColor = "#3b82f640";
-                    setTimeout(() => { targetLine.style.backgroundColor = ""; }, 1000);
-                }
-            });
-        });
-    }
-
-    function escapeHtml(str) {
-        return str.replace(/[&<>]/g, function(m) {
-            if (m === '&') return '&amp;';
-            if (m === '<') return '&lt;';
-            if (m === '>') return '&gt;';
-            return m;
-        }).replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, function(c) {
-            return c;
-        });
-    }
-
-    function escapeRegex(str) {
-        return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    }
-
-    // Update log from text
-    function setLogText(text) {
-        rawLogText = text;
-        renderLog();
-    }
-
-    // File upload handling
-    function handleFiles(files) {
-        const readers = [];
-        let allContent = "";
-        for (let i = 0; i < files.length; i++) {
-            const reader = new FileReader();
-            readers.push(new Promise((resolve) => {
-                reader.onload = (e) => {
-                    resolve(e.target.result);
-                };
-                reader.readAsText(files[i]);
-            }));
-        }
-        Promise.all(readers).then(contents => {
-            allContent = contents.join("\n\n=== End of Previous Log ===\n\n");
-            setLogText(allContent);
-            showToast(`Loaded ${files.length} file(s)`);
-        });
-    }
-
-    fileInput.addEventListener("change", (e) => handleFiles(e.target.files));
-    uploadZone.addEventListener("dragover", (e) => { e.preventDefault(); uploadZone.classList.add("drag-over"); });
-    uploadZone.addEventListener("dragleave", () => uploadZone.classList.remove("drag-over"));
-    uploadZone.addEventListener("drop", (e) => {
-        e.preventDefault();
-        uploadZone.classList.remove("drag-over");
-        handleFiles(e.dataTransfer.files);
-    });
-
-    pasteModalBtn.addEventListener("click", () => {
-        const text = prompt("Paste your FRST log content here:");
-        if (text) setLogText(text);
-    });
-
-    liveFilter.addEventListener("input", (e) => {
-        currentFilter = e.target.value;
-        renderLog();
-    });
-
-    // Extractor
-    runExtract.addEventListener("click", () => {
-        const kw = extractKeyword.value.trim();
-        if (!kw || !rawLogText) { extractOutput.value = "No keyword or no log loaded."; return; }
-        const lines = rawLogText.split(/\r?\n/);
-        const matches = lines.filter(l => l.toLowerCase().includes(kw.toLowerCase()));
-        extractOutput.value = matches.join("\n");
-        showToast(`Found ${matches.length} lines`);
-    });
-    copyExtract.addEventListener("click", () => {
-        if (extractOutput.value) {
-            navigator.clipboard.writeText(extractOutput.value) {
-            navigator.clipboard.writeText(extractOutput.value);
-            showToast("Extracted lines copied");
-        }
-    });
-
-    // Fixlist: export and copy
-    exportFixlist.addEventListener("click", () => {
-        const content = fixlistEditor.value;
-        const blob = new Blob([content], {type: "text/plain"});
-        const a = document.createElement("a");
-        const url = URL.createObjectURL(blob);
-        a.href = url;
-        a.download = "fixlist.txt";
-        a.click();
-        URL.revokeObjectURL(url);
-        showToast("fixlist.txt exported");
-    });
-    copyFixlist.addEventListener("click", () => {
-        navigator.clipboard.writeText(fixlistEditor.value);
-        showToast("Fixlist copied");
-    });
-
-    // Add selected log line to fixlist (via "Add selected line" button? We'll add a small button in fixlist panel)
-    const addLineBtn = document.createElement("button");
-    addLineBtn.textContent = "➕ Add last copied line";
-    addLineBtn.className = "secondary";
-    addLineBtn.style.marginTop = "8px";
-    document.querySelector("#fixlistPanel .flex-between").after(addLineBtn);
-    let lastCopiedLine = "";
-    document.body.addEventListener("click", (e) => {
-        const lineDiv = e.target.closest(".log-line");
-        if (lineDiv && lineDiv.getAttribute("data-raw")) {
-            lastCopiedLine = lineDiv.getAttribute("data-raw");
-        }
-    });
-    addLineBtn.addEventListener("click", () => {
-        if (lastCopiedLine) {
-            fixlistEditor.value += "\n" + lastCopiedLine;
-            showToast("Line added to fixlist");
-        } else {
-            showToast("Tap a log line first to copy it", 1000);
-        }
-    });
-
-    // Custom keywords storage
-    function refreshCustomKeywordsUI() {
-        customKeywordsList.innerHTML = "";
-        customKeywords.forEach((kw, idx) => {
-            const span = document.createElement("span");
-            span.style.display = "inline-block";
-            span.style.background = "#854d0e";
-            span.style.color = "#fde047";
-            span.style.padding = "4px 8px";
-            span.style.borderRadius = "20px";
-            span.style.margin = "4px";
-            span.style.fontSize = "10px";
-            span.textContent = kw;
-            const delBtn = document.createElement("button");
-            delBtn.textContent = "✖";
-            delBtn.style.background = "none";
-            delBtn.style.border = "none";
-            delBtn.style.color = "#f87171";
-            delBtn.style.marginLeft = "6px";
-            delBtn.style.cursor = "pointer";
-            delBtn.onclick = () => {
-                customKeywords.splice(idx, 1);
-                localStorage.setItem("frst_custom_keywords", JSON.stringify(customKeywords));
-                refreshCustomKeywordsUI();
-                renderLog();
-            };
-            span.appendChild(delBtn);
-            customKeywordsList.appendChild(span);
-        });
-    }
-    addCustomKeyword.addEventListener("click", () => {
-        const kw = newCustomKeyword.value.trim();
-        if (kw && !customKeywords.includes(kw)) {
-            customKeywords.push(kw);
-            localStorage.setItem("frst_custom_keywords", JSON.stringify(customKeywords));
-            refreshCustomKeywordsUI();
+            fileNameDisplay.innerText = fileNames.join(', ');
+            document.getElementById('log-input').value = combinedContent;
             renderLog();
-            newCustomKeyword.value = "";
         }
-    });
-    clearCustomKeywords.addEventListener("click", () => {
-        customKeywords = [];
-        localStorage.setItem("frst_custom_keywords", "[]");
-        refreshCustomKeywordsUI();
-        renderLog();
-    });
-    refreshCustomKeywordsUI();
 
-    // VirusTotal integration
-    vtApiKeyInput.value = vtApiKey;
-    saveApiKey.addEventListener("click", () => {
-        const key = vtApiKeyInput.value.trim();
-        vtApiKey = key;
-        localStorage.setItem("vt_api_key", key);
-        showToast("API key saved (if valid)");
-    });
-
-    async function vtRequest(endpoint, body = null, method = "GET") {
-        if (!vtApiKey) {
-            vtResult.innerHTML = "<span style='color:#f87171'>❌ No API key set. Please enter your VirusTotal API key in Tools.</span>";
-            return null;
+        function matchDatabaseKeyword(line, keyword) {
+            if (keyword.startsWith('/') && keyword.endsWith('/') && keyword.length > 2) {
+                try {
+                    return new RegExp(keyword.slice(1, -1), 'i').test(line);
+                } catch (e) { return false; }
+            }
+            return line.toLowerCase().includes(keyword.toLowerCase());
         }
-        const url = `https://www.virustotal.com/api/v3/${endpoint}`;
-        const headers = { "x-apikey": vtApiKey };
-        const options = { method, headers };
-        if (body) options.body = body;
-        try {
-            const resp = await fetch(url, options);
-            const data = await resp.json();
-            if (!resp.ok) throw new Error(data.error?.message || "HTTP " + resp.status);
-            return data;
-        } catch (err) {
-            vtResult.innerHTML = `<span style='color:#f87171'>Error: ${err.message}</span>`;
-            return null;
-        }
-    }
 
-    vtHashBtn.addEventListener("click", async () => {
-        const hash = vtHash.value.trim();
-        if (!hash) { showToast("Enter a hash"); return; }
-        vtResult.innerHTML = "⏳ Looking up hash...";
-        const data = await vtRequest(`files/${hash}`);
-        if (data && data.data) {
-            const attrs = data.data.attributes;
-            const stats = attrs.last_analysis_stats;
-            vtResult.innerHTML = `<strong>File:</strong> ${attrs.meaningful_name || attrs.name || hash}<br>
-                                   <strong>Detection ratio:</strong> ${stats.malicious}/${stats.malicious+stats.undetected}<br>
-                                   <strong>Last analysis:</strong> ${new Date(attrs.last_analysis_date*1000).toLocaleString()}<br>
-                                   <a href="https://www.virustotal.com/gui/file/${hash}" target="_blank">🔗 View on VirusTotal</a>`;
-        } else if (data && data.error) {
-            vtResult.innerHTML = `⚠️ ${data.error.message || "Not found"}`;
-        }
-    });
+        function renderLog() {
+            const rawText = document.getElementById('log-input').value;
+            if (!rawText) return;
+            
+            currentLogLines = rawText.split('\n');
+            const displayEl = document.getElementById('log-display');
+            displayEl.innerHTML = ''; 
+            
+            const jumper = document.getElementById('section-jumper');
+            jumper.innerHTML = '<option value="">-- Jump to Section --</option>';
 
-    vtFileBtn.addEventListener("click", async () => {
-        const file = vtFileUpload.files[0];
-        if (!file) { showToast("Select a file first"); return; }
-        if (!vtApiKey) { vtResult.innerHTML = "❌ No API key set."; return; }
-        vtResult.innerHTML = "⏳ Uploading file to VirusTotal (this may take a while)...";
-        const formData = new FormData();
-        formData.append("file", file);
-        const data = await vtRequest("files", formData, "POST");
-        if (data && data.data) {
-            const analysisId = data.data.id;
-            vtResult.innerHTML = `✅ File uploaded. Analysis ID: ${analysisId}<br>Waiting for results...`;
-            // Poll for result (simplified)
-            setTimeout(async () => {
-                const result = await vtRequest(`analyses/${analysisId}`);
-                if (result && result.data && result.data.attributes) {
-                    const stats = result.data.attributes.stats;
-                    vtResult.innerHTML = `<strong>Analysis complete</strong><br>Malicious: ${stats.malicious}, Suspicious: ${stats.suspicious}, Undetected: ${stats.undetected}<br>
-                                           <a href="https://www.virustotal.com/gui/file/${result.data.id}" target="_blank">🔗 View report</a>`;
+            const frstGroup = document.createElement('optgroup');
+            frstGroup.label = "─── FRST.txt Sections ───";
+            const additionGroup = document.createElement('optgroup');
+            additionGroup.label = "─── Addition.txt Sections ───";
+
+            const yellowDB = safeGetStorage('frst_yellow_db', []);
+            const orangeDB = safeGetStorage('frst_orange_db', []);
+            const fragment = document.createDocumentFragment();
+
+            currentLogLines.forEach((line, index) => {
+                const lineEl = document.createElement('div');
+                lineEl.id = `log-L${index}`;
+                
+                if (line.startsWith('====================') && line.trim().endsWith('====================')) {
+                    const cleanTitle = line.replace(/=/g, '').trim();
+                    const lowerTitle = cleanTitle.toLowerCase();
+                    const opt = document.createElement('option');
+                    opt.value = `log-L${index}`;
+                    opt.textContent = cleanTitle;
+
+                    if (frstSections.some(sec => lowerTitle.includes(sec))) frstGroup.appendChild(opt);
+                    else if (additionSections.some(sec => lowerTitle.includes(sec))) additionGroup.appendChild(opt);
+                    else frstGroup.appendChild(opt);
                 }
-            }, 5000);
-        }
-    });
 
-    // Panel navigation (bottom dock)
-    const navBtns = document.querySelectorAll(".nav-btn");
-    const panels = {
-        logPanel: document.getElementById("logPanel"),
-        extractorPanel: document.getElementById("extractorPanel"),
-        fixlistPanel: document.getElementById("fixlistPanel"),
-        settingsPanel: document.getElementById("settingsPanel")
-    };
-    navBtns.forEach(btn => {
-        btn.addEventListener("click", () => {
-            const targetId = btn.getAttribute("data-panel");
-            Object.keys(panels).forEach(pid => {
-                panels[pid].classList.remove("active-panel");
+                let safeLine = line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                
+                let matchesOrange = orangeDB.some(keyword => matchDatabaseKeyword(line, keyword));
+                let matchesYellow = yellowDB.some(keyword => matchDatabaseKeyword(line, keyword));
+
+                if (matchesOrange && line.trim() !== '') lineEl.classList.add('hl-orange');
+                else if (matchesYellow && line.trim() !== '') lineEl.classList.add('hl-yellow');
+                else if (line.includes('ATTENTION')) lineEl.classList.add('hl-attention');
+                else if (line.includes('No File')) lineEl.classList.add('hl-nofile');
+
+                lineEl.innerHTML = safeLine || '&nbsp;';
+                fragment.appendChild(lineEl);
             });
-            panels[targetId].classList.add("active-panel");
-            navBtns.forEach(b => b.classList.remove("active"));
-            btn.classList.add("active");
-        });
-    });
+            
+            if (frstGroup.children.length > 0) jumper.appendChild(frstGroup);
+            if (additionGroup.children.length > 0) jumper.appendChild(additionGroup);
 
-    // Initialize with demo hint
-    setLogText(""); // empty
-</script>
+            displayEl.appendChild(fragment);
+            document.querySelector('.input-group').style.display = 'none'; 
+            document.getElementById('utility-bar').style.display = 'flex';
+        }
+
+        // --- MOBILE HOLD-TO-COPY LOGIC --- //
+        let pressTimer;
+        let pressTargetIdx = -1;
+        const logDisplay = document.getElementById('log-display');
+
+        function startLongPress(e) {
+            let targetDiv = e.target.closest('div[id^="log-L"]');
+            if (!targetDiv) return;
+            
+            pressTargetIdx = parseInt(targetDiv.id.replace('log-L', ''));
+            pressTimer = setTimeout(() => {
+                copyLineToClipboard(pressTargetIdx);
+            }, 500); 
+        }
+
+        function cancelLongPress() {
+            clearTimeout(pressTimer);
+            pressTargetIdx = -1;
+        }
+
+        logDisplay.addEventListener('touchstart', startLongPress, {passive: true});
+        logDisplay.addEventListener('touchend', cancelLongPress);
+        logDisplay.addEventListener('touchmove', cancelLongPress, {passive: true}); 
+        logDisplay.addEventListener('mousedown', startLongPress);
+        logDisplay.addEventListener('mouseup', cancelLongPress);
+        logDisplay.addEventListener('mouseleave', cancelLongPress);
+
+        function copyLineToClipboard(index) {
+            cancelLongPress(); 
+            if(index < 0 || index >= currentLogLines.length) return;
+            
+            let rawText = currentLogLines[index];
+            navigator.clipboard.writeText(rawText).then(() => {
+                document.getElementById('log-L' + index).classList.add('hl-copied');
+                const toast = document.getElementById('toast');
+                toast.style.display = 'block';
+                setTimeout(() => { toast.style.display = 'none'; }, 1000);
+            });
+        }
+
+        // Runs secure cross-origin file verification lookup routing
+        function runExternalFileLookup() {
+            const inputEl = document.getElementById('lookup-filename-input');
+            const targetFile = inputEl.value.trim();
+            if(!targetFile) return;
+
+            // Directs sandbox safely to Google domain scanning specialized site parameters
+            const queryUrl = 'https://www.google.com/search?q=site:file.net+' + encodeURIComponent(targetFile);
+            window.open(queryUrl, '_blank');
+        }
+
+        function jumpToSection() {
+            const targetId = document.getElementById('section-jumper').value;
+            if (!targetId) return;
+            const targetEl = document.getElementById(targetId);
+            if (targetEl) targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        function filterLogView() {
+            const query = document.getElementById('live-filter').value.toLowerCase();
+            const lines = document.getElementById('log-display').getElementsByTagName('div');
+            for (let i = 0; i < lines.length; i++) {
+                if (lines[i].textContent.toLowerCase().includes(query)) lines[i].style.display = '';
+                else lines[i].style.display = 'none';
+            }
+        }
+
+        function clearFixlist() {
+            if(confirm("Reset fixlist container workspace back to default template layout?")) {
+                document.getElementById('fixlist-area').value = initialFixlistTemplate;
+            }
+        }
+
+        function downloadFixlist() {
+            const content = document.getElementById('fixlist-area').value;
+            const blob = new Blob([content], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'fixlist.txt';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        function openModal(id) {
+            document.getElementById(id).style.display = 'flex';
+            if(id === 'tools-modal') document.getElementById('tool-instruction').focus();
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).style.display = 'none';
+        }
+
+        function processInstruction() {
+            const instruction = document.getElementById('tool-instruction').value.trim();
+            if (!instruction) return;
+            let extractedLines = [];
+            for (let line of currentLogLines) {
+                if (line.includes(instruction)) extractedLines.push(line);
+            }
+            document.getElementById('results-area').value = extractedLines.join('\n');
+            closeModal('tools-modal');
+            openModal('results-modal');
+            document.getElementById('copy-btn').innerText = 'Copy All';
+        }
+
+        function copyResults(textareaId, buttonId) {
+            const resultsArea = document.getElementById(textareaId);
+            resultsArea.select();
+            resultsArea.setSelectionRange(0, 99999);
+            navigator.clipboard.writeText(resultsArea.value).then(() => {
+                document.getElementById(buttonId).innerText = 'Copied!';
+            });
+        }
+
+        function openHelperModal() {
+            loadHelperEntries();
+            renderDatabaseKeywords();
+            openModal('helper-modal');
+        }
+
+        function saveDatabaseKeyword(color) {
+            const inputEl = document.getElementById('db-keyword-input');
+            const keyword = inputEl.value.trim();
+            if(!keyword) return;
+
+            let storageKey = color === 'orange' ? 'frst_orange_db' : 'frst_yellow_db';
+            let db = safeGetStorage(storageKey, []);
+            
+            if(!db.includes(keyword)) {
+                db.push(keyword);
+                safeSetStorage(storageKey, db);
+            }
+            inputEl.value = '';
+            renderDatabaseKeywords();
+            if(currentLogLines.length > 0) renderLog();
+        }
+
+        function renderDatabaseKeywords() {
+            const holder = document.getElementById('db-keywords-holder');
+            let yellowDb = safeGetStorage('frst_yellow_db', []);
+            let orangeDb = safeGetStorage('frst_orange_db', []);
+            
+            if(yellowDb.length === 0 && orangeDb.length === 0) {
+                holder.innerHTML = '<p style="font-size:11px; color:#666; margin:0;">Databases empty.</p>';
+                return;
+            }
+            
+            let html = '';
+            yellowDb.forEach((k, idx) => { html += `<span class="db-tag db-tag-yellow">${escapeHTML(k)} <b style="color:red; cursor:pointer; margin-left:6px;" onclick="deleteDatabaseKeyword('yellow', ${idx})">&times;</b></span>`; });
+            orangeDb.forEach((k, idx) => { html += `<span class="db-tag db-tag-orange">${escapeHTML(k)} <b style="color:red; cursor:pointer; margin-left:6px;" onclick="deleteDatabaseKeyword('orange', ${idx})">&times;</b></span>`; });
+            holder.innerHTML = html;
+        }
+
+        function deleteDatabaseKeyword(color, index) {
+            let storageKey = color === 'orange' ? 'frst_orange_db' : 'frst_yellow_db';
+            let db = safeGetStorage(storageKey, []);
+            db.splice(index, 1);
+            safeSetStorage(storageKey, db);
+            renderDatabaseKeywords();
+            if(currentLogLines.length > 0) renderLog();
+        }
+
+        function saveHelperEntry() {
+            const sectionTitle = document.getElementById('helper-input-section').value.trim() || 'General Snippet';
+            const textValue = document.getElementById('helper-input-text').value.trim();
+            if (!textValue) return;
+
+            let items = safeGetStorage('frst_helper_items', []);
+            items.push({ id: Date.now(), section: sectionTitle, content: textValue });
+            safeSetStorage('frst_helper_items', items);
+            
+            document.getElementById('helper-input-section').value = '';
+            document.getElementById('helper-input-text').value = '';
+            loadHelperEntries();
+        }
+
+        function loadHelperEntries() {
+            const displayBox = document.getElementById('helper-saved-list');
+            let items = safeGetStorage('frst_helper_items', []);
+            if(items.length === 0) {
+                displayBox.innerHTML = '<p style="color:#666; font-style:italic;">No saved snippets.</p>';
+                return;
+            }
+            let html = '';
+            items.forEach(item => {
+                html += `<div class="helper-section"><div class="helper-title"><span>📂 ${escapeHTML(item.section)}</span><span class="delete-btn" onclick="deleteHelperEntry(${item.id})">❌ Delete</span></div><div class="helper-body" onclick="document.execCommand('copy')">${escapeHTML(item.content)}</div></div>`;
+            });
+            displayBox.innerHTML = html;
+        }
+
+        function deleteHelperEntry(id) {
+            let items = safeGetStorage('frst_helper_items', []);
+            items = items.filter(item => item.id !== id);
+            safeSetStorage('frst_helper_items', items);
+            loadHelperEntries();
+        }
+
+        function escapeHTML(str) {
+            return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        }
+    </script>
 </body>
 </html>
